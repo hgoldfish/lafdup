@@ -8,6 +8,12 @@ Introduction
 Synchronize clipboard between computers by network broadcast. Data is encrypted using aes256-cbf.
 
 
+Download
+--------
+
+[Windows Version](https://qtng.org/sync_clipbpard.7z)
+
+
 License
 -------
 

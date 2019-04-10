@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file>images/ic_file_upload_black_48dp.png</file>
+        <file>images/ic_file_download_black_48dp.png</file>
+        <file>images/bluefish.png</file>
+    </qresource>
+</RCC>

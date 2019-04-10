@@ -11,7 +11,7 @@ Synchronize clipboard between computers by network broadcast. Data is encrypted 
 Download
 --------
 
-[Windows Version](https://qtng.org/sync_clipbpard.7z)
+[Windows Version](https://qtng.org/sync_clipboard.7z)
 
 
 License

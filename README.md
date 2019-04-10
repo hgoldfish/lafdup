@@ -1,6 +1,8 @@
 SyncClipboard
 =============
 
+![Screenshot Of SyncClipboard](https://raw.githubusercontent.com/hgoldfish/lafdup/master/images/screenshot.png)
+
 
 Introduction
 ------------

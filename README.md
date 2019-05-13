@@ -15,6 +15,8 @@ Download
 
 [Windows Version](https://qtng.org/sync_clipboard.7z)
 
+[Android Version](https://play.google.com/store/apps/details?id=com.hgoldfish.lafdup)
+
 
 License
 -------

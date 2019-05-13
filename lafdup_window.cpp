@@ -1,9 +1,14 @@
 #include <QtCore/qabstractitemmodel.h>
 #include <QtCore/qsettings.h>
+#include <QtCore/qtimer.h>
 #include <QtGui/qevent.h>
 #include <QtGui/qclipboard.h>
 #include <QtWidgets/qmessagebox.h>
 #include <QtWidgets/qmenu.h>
+#include <QtWidgets/qdesktopwidget.h>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
 #include "lafdup_window.h"
 #include "lafdup_window_p.h"
 #include "ui_main.h"
@@ -90,7 +95,7 @@ private:
 };
 
 
-bool CtrlEnterListener::eventFilter(QObject *watched, QEvent *event)
+bool CtrlEnterListener::eventFilter(QObject *, QEvent *event)
 {
     QKeyEvent *keyEvent = dynamic_cast<QKeyEvent*>(event);
     if (keyEvent && keyEvent->type() == QEvent::KeyPress) {
@@ -107,8 +112,8 @@ LafdupWindow::LafdupWindow()
     , peer(new LafdupPeer())
     , actionModel(new ActionModel())
     , trayIcon(new QSystemTrayIcon())
-    , exiting(false)
 {
+    qDebug() << "hello!";
     ui->setupUi(this);
     ui->txtContent->installEventFilter(new CtrlEnterListener(this));
 
@@ -126,9 +131,9 @@ LafdupWindow::LafdupWindow()
     connect(ui->btnSetPassword, SIGNAL(clicked(bool)), SLOT(setPassword()));
     connect(peer.data(), SIGNAL(incoming(QDateTime,QString)), SLOT(updateClipboard(QDateTime,QString)));
     connect(peer.data(), SIGNAL(stateChanged(bool)), SLOT(onPeerStateChanged(bool)));
-    connect(trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)), SLOT(show()));
-    connect(actionShow, SIGNAL(triggered(bool)), SLOT(show()));
-    connect(actionExit, SIGNAL(triggered(bool)), SLOT(closeForcely()));
+    connect(trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)), SLOT(showAndGetFocus()));
+    connect(actionShow, SIGNAL(triggered(bool)), SLOT(showAndGetFocus()));
+    connect(actionExit, SIGNAL(triggered(bool)), QCoreApplication::instance(), SLOT(quit()));
 
     const QClipboard *clipboard = QApplication::clipboard();
     connect(clipboard, SIGNAL(dataChanged()), SLOT(onClipboardChanged()));
@@ -160,15 +165,23 @@ void LafdupWindow::showEvent(QShowEvent *event)
 }
 
 
+void LafdupWindow::changeEvent(QEvent *event)
+{
+    QWidget::changeEvent(event);
+    QWindowStateChangeEvent *wsce = dynamic_cast<QWindowStateChangeEvent*>(event);
+    if (wsce) {
+        if (!(wsce->oldState() & Qt::WindowMinimized) && (windowState() & Qt::WindowMinimized)) {
+            QTimer::singleShot(0, this, SLOT(hide()));
+            trayIcon->showMessage(windowTitle(), tr("Sync Clipboard is minimized to tray icon."));
+        }
+    }
+}
+
+
 void LafdupWindow::closeEvent(QCloseEvent *event)
 {
-    if (exiting) {
-        QCoreApplication::instance()->quit();
-    } else {
-        event->ignore();
-        hide();
-        trayIcon->showMessage(windowTitle(), tr("Click this to show Lafdup again."));
-    }
+    QWidget::closeEvent(event);
+    QCoreApplication::instance()->quit();
 }
 
 
@@ -258,13 +271,6 @@ void LafdupWindow::useOldContent(const QModelIndex &current)
 }
 
 
-void LafdupWindow::closeForcely()
-{
-    exiting = true;
-    close();
-}
-
-
 void LafdupWindow::updateMyIP()
 {
     QString text = QStringLiteral("IP Addresses:\n");
@@ -310,6 +316,30 @@ void LafdupWindow::loadKnownPeers()
         peer->setKnownPeers(addresses);
     }
 }
+
+
+void moveToCenter(QWidget * const widget)
+{
+    QRect r = widget->geometry();
+    r.moveCenter(QApplication::desktop()->screenGeometry().center());
+    widget->setGeometry(r);
+}
+
+void LafdupWindow::showAndGetFocus()
+{
+    if (windowState() & Qt::WindowMinimized) {
+        setWindowState(windowState() ^ Qt::WindowMinimized);
+    }
+    show();
+    activateWindow();
+#ifdef Q_OS_WIN
+    BringWindowToTop(static_cast<HWND>(winId()));
+    SwitchToThisWindow(static_cast<HWND>(winId()));
+#endif
+    raise();
+    moveToCenter(this);
+}
+
 
 
 PasswordDialog::PasswordDialog(QWidget *parent)

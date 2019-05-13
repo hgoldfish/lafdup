@@ -175,7 +175,7 @@ bool LafdupPeerPrivate::send(const QString &text)
         return false;
     }
 
-    mps << DefaultPort << (quint8) 1 << QDateTime::currentDateTime() << hash << encrypted;
+    mps << DefaultPort << static_cast<quint8>(1) << QDateTime::currentDateTime() << hash << encrypted;
     if (mps.status() != MsgPackStream::Ok) {
         qDebug() << "can not serialize packet.";
         return false;

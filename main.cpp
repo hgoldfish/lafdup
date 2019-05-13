@@ -11,7 +11,6 @@ int main(int argc, char **argv)
     app.setApplicationName("SyncClipboard");
     app.setApplicationVersion("1.0");
     app.setWindowIcon(QIcon(":/images/bluefish.png"));
-    app.setQuitOnLastWindowClosed(true);
 
 #ifdef Q_OS_WIN
     QFont f = app.font();
@@ -19,7 +18,7 @@ int main(int argc, char **argv)
     app.setFont(f);
 #endif
     LafdupWindow w;
-    w.show();
+    w.showAndGetFocus();
 
     return qtng::startQtLoop();
 }

@@ -19,17 +19,18 @@ public:
     LafdupWindow();
     virtual ~LafdupWindow() override;
 protected:
-    void showEvent(QShowEvent *event);
-    void closeEvent(QCloseEvent *event);
+    virtual void showEvent(QShowEvent *event) override;
+    virtual void changeEvent(QEvent *event) override;
+    virtual void closeEvent(QCloseEvent *event) override;
 public slots:
     void sendContent();
+    void showAndGetFocus();
 private slots:
     void updateClipboard(const QDateTime &timestamp, const QString &text);
     void onPeerStateChanged(bool ok);
     void managePeers();
     void setPassword();
     void useOldContent(const QModelIndex &current);
-    void closeForcely();
     void onClipboardChanged();
 private:
     void updateMyIP();
@@ -41,7 +42,6 @@ private:
     ActionModel *actionModel;
     QSystemTrayIcon *trayIcon;
     QMenu *trayMenu;
-    bool exiting;
     bool started;
 };
 

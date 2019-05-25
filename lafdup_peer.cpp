@@ -17,8 +17,8 @@ public:
     void stop();
     void serve();
     void handleRequest(const QByteArray &packet);
-    bool send(const QString &text);
-    void broadcast(const QByteArray &packet);
+    bool send(const QDateTime &timestamp, const QString &text);
+    void broadcast(const QByteArray &plain, const QByteArray &hash, const QDateTime &timestamp);
 public:
     QSharedPointer<Socket> socket;
     CoroutineGroup *operations;
@@ -148,45 +148,22 @@ void LafdupPeerPrivate::handleRequest(const QByteArray &packet)
 }
 
 
-bool LafdupPeerPrivate::send(const QString &text)
+bool LafdupPeerPrivate::send(const QDateTime &timestamp, const QString &text)
 {
     if (text.isEmpty()) {
         return false;
     }
 
-    QByteArray packet;
-    MsgPackStream mps(&packet, QIODevice::WriteOnly);
-
     const QByteArray &plain = text.toUtf8();
     const QByteArray &hash = MessageDigest::digest(plain, MessageDigest::Sha256);
-
-    QByteArray encrypted;
-    if (cipher.isNull()) {
-        encrypted = plain;
-    } else {
-        QSharedPointer<Cipher> outgoingCipher(this->cipher->copy(Cipher::Encrypt));
-        encrypted = outgoingCipher->addData(plain);
-        encrypted.append(outgoingCipher->finalData());
-        qDebug() << encrypted.size();
-    }
-
-    if (hash.isEmpty() || encrypted.isEmpty()) {
+    if (hash.isEmpty()) {
         qDebug() << "cipher is bad.";
         return false;
     }
-
-    mps << DefaultPort << static_cast<quint8>(1) << QDateTime::currentDateTime() << hash << encrypted;
-    if (mps.status() != MsgPackStream::Ok) {
-        qDebug() << "can not serialize packet.";
-        return false;
-    }
-
-    if (packet.size() >= 1024 * 64) {
-        return false;
-    }
-
     oldHashes.insert(hash);
-    operations->spawnWithName("broadcast", [this, packet] { broadcast(packet); }, true);
+    operations->spawnWithName("broadcast", [this, plain, hash, timestamp] {
+        broadcast(plain, hash, timestamp);
+    }, true);
     return true;
 }
 
@@ -206,9 +183,42 @@ static QSet<QHostAddress> allBroadcastAddresses()
     return addresses;
 }
 
-void LafdupPeerPrivate::broadcast(const QByteArray &packet)
+void LafdupPeerPrivate::broadcast(const QByteArray &plain, const QByteArray &hash, const QDateTime &timestamp)
 {
+    QSharedPointer<Cipher> lastCipher = cipher;
+    QByteArray packet;
+
     while (true) {
+        if (packet.isEmpty() || lastCipher != cipher) {
+            if (lastCipher != this->cipher) {
+                lastCipher = this->cipher;
+            }
+
+            QByteArray encrypted;
+            if (cipher.isNull()) {
+                encrypted = plain;
+            } else {
+                QSharedPointer<Cipher> outgoingCipher(this->cipher->copy(Cipher::Encrypt));
+                encrypted = outgoingCipher->addData(plain);
+                encrypted.append(outgoingCipher->finalData());
+                if (encrypted.isEmpty()) {
+                    qDebug() << "cipher is bad.";
+                    return;
+                }
+            }
+
+            MsgPackStream mps(&packet, QIODevice::WriteOnly);
+            mps << DefaultPort << static_cast<quint8>(1) << timestamp << hash << encrypted;
+            if (mps.status() != MsgPackStream::Ok) {
+                qDebug() << "can not serialize packet.";
+                return;
+            }
+
+            if (packet.size() >= 1024 * 64) {
+                return;
+            }
+        }
+
         const QSet<QHostAddress> &broadcastList = allBroadcastAddresses();
         for (const QHostAddress &addr: broadcastList) {
             qint32 bs = socket->sendto(packet, addr, DefaultPort);
@@ -279,10 +289,10 @@ void LafdupPeer::setKnownPeers(const QList<QHostAddress> &knownPeers)
 }
 
 
-bool LafdupPeer::outgoing(const QString &text)
+bool LafdupPeer::outgoing(const QDateTime &timestamp, const QString &text)
 {
     Q_D(LafdupPeer);
-    return d->send(text);
+    return d->send(timestamp, text);
 }
 
 

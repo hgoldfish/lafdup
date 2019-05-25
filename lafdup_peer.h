@@ -23,7 +23,7 @@ signals:
     void incoming(const QDateTime &timestamp, const QString &text);
     void stateChanged(bool ok);
 public slots:
-    bool outgoing(const QString &text);
+    bool outgoing(const QDateTime &timestamp, const QString &text);
 private:
     LafdupPeerPrivate *dd_ptr;
     Q_DECLARE_PRIVATE_D(dd_ptr, LafdupPeer)

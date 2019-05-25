@@ -6,9 +6,6 @@
 #include <QtWidgets/qmessagebox.h>
 #include <QtWidgets/qmenu.h>
 #include <QtWidgets/qdesktopwidget.h>
-#ifdef Q_OS_WIN
-#include <windows.h>
-#endif
 #include "lafdup_window.h"
 #include "lafdup_window_p.h"
 #include "ui_main.h"
@@ -194,11 +191,12 @@ void LafdupWindow::sendContent()
         return;
     }
 
-    bool ok = peer->outgoing(text);
+    const QDateTime &now = QDateTime::currentDateTime();
+    bool ok = peer->outgoing(now, text);
     if (!ok) {
         QMessageBox::information(this, windowTitle(), tr("Can not send content."));
     }
-    const QModelIndex &current = actionModel->addAction(ActionType::Outgoing, QDateTime::currentDateTime(), text);
+    const QModelIndex &current = actionModel->addAction(ActionType::Outgoing, now, text);
     ui->lstActions->setCurrentIndex(current);
     ui->txtContent->clear();
     ui->txtContent->setFocus();
@@ -216,11 +214,12 @@ void LafdupWindow::onClipboardChanged()
     if (found) {
         return;
     }
-    bool ok = peer->outgoing(text);
+    const QDateTime &now = QDateTime::currentDateTime();
+    bool ok = peer->outgoing(now, text);
     if (!ok) {
         QMessageBox::information(this, windowTitle(), tr("Can not send content."));
     }
-    const QModelIndex &current = actionModel->addAction(ActionType::Outgoing, QDateTime::currentDateTime(), text);
+    const QModelIndex &current = actionModel->addAction(ActionType::Outgoing, now, text);
     ui->lstActions->setCurrentIndex(current);
     ui->txtContent->clear();
     ui->txtContent->setFocus();
@@ -332,10 +331,6 @@ void LafdupWindow::showAndGetFocus()
     }
     show();
     activateWindow();
-#ifdef Q_OS_WIN
-    BringWindowToTop(static_cast<HWND>(winId()));
-    SwitchToThisWindow(static_cast<HWND>(winId()));
-#endif
     raise();
     moveToCenter(this);
 }

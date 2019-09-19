@@ -24,7 +24,7 @@ public:
     CoroutineGroup *operations;
     QSharedPointer<Cipher> cipher;
     QList<QHostAddress> knownPeers;
-    QSet<QByteArray> oldHashes;
+    QList<QByteArray> oldHashes;
 private:
     LafdupPeer * const q_ptr;
     Q_DECLARE_PUBLIC(LafdupPeer)
@@ -86,6 +86,11 @@ void LafdupPeerPrivate::serve()
     }
 }
 
+inline QByteArray makeHash(const QDateTime &timestamp, const QByteArray &hash)
+{
+    return timestamp.toString().toUtf8() + hash;
+}
+
 
 void LafdupPeerPrivate::handleRequest(const QByteArray &packet)
 {
@@ -109,10 +114,11 @@ void LafdupPeerPrivate::handleRequest(const QByteArray &packet)
         return;
     }
 
-    if (oldHashes.contains(itsHash)) {
+    
+    if (!oldHashes.isEmpty() && oldHashes.contains(makeHash(timestamp, itsHash))) {
         return;
     }
-    oldHashes.insert(itsHash);
+    oldHashes.prepend(itsHash);
 
     QByteArray plain;
     if (!cipher.isNull()) {
@@ -160,7 +166,7 @@ bool LafdupPeerPrivate::send(const QDateTime &timestamp, const QString &text)
         qDebug() << "cipher is bad.";
         return false;
     }
-    oldHashes.insert(hash);
+    oldHashes.prepend(makeHash(timestamp, hash));
     operations->spawnWithName("broadcast", [this, plain, hash, timestamp] {
         broadcast(plain, hash, timestamp);
     }, true);

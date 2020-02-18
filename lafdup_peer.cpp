@@ -34,9 +34,13 @@ public:
     CoroutineGroup *operations;
     QSharedPointer<Cipher> cipher;
     QList<QHostAddress> knownPeers;
+<<<<<<< HEAD
     QSet<QPair<QHostAddress, quint16>> extraKnownPeers;
     QList<QByteArray> oldHashes;
     quint32 myId;
+=======
+    QList<QByteArray> oldHashes;
+>>>>>>> 8d7012a1b3add9e78415bb2a1c469304a35bb146
 private:
     LafdupPeer * const q_ptr;
     Q_DECLARE_PUBLIC(LafdupPeer)
@@ -102,6 +106,11 @@ void LafdupPeerPrivate::serve()
     }
 }
 
+inline QByteArray makeHash(const QDateTime &timestamp, const QByteArray &hash)
+{
+    return timestamp.toString().toUtf8() + hash;
+}
+
 
 inline QByteArray concat(const QDateTime &timestamp, const QByteArray &hash)
 {
@@ -157,8 +166,13 @@ void LafdupPeerPrivate::parseAndHandleDataPacket(MsgPackStream &mps,  const QHos
         return;
     }
 
+<<<<<<< HEAD
 
     if (!oldHashes.isEmpty() && oldHashes.contains(concat(timestamp, itsHash))) {
+=======
+    
+    if (!oldHashes.isEmpty() && oldHashes.contains(makeHash(timestamp, itsHash))) {
+>>>>>>> 8d7012a1b3add9e78415bb2a1c469304a35bb146
         return;
     }
     oldHashes.prepend(itsHash);
@@ -215,7 +229,11 @@ bool LafdupPeerPrivate::outgoing(const QDateTime &timestamp, const QString &text
         qDebug() << "cipher is bad.";
         return false;
     }
+<<<<<<< HEAD
     oldHashes.prepend(concat(timestamp, hash));
+=======
+    oldHashes.prepend(makeHash(timestamp, hash));
+>>>>>>> 8d7012a1b3add9e78415bb2a1c469304a35bb146
     operations->spawnWithName("broadcast", [this, plain, hash, timestamp] {
         broadcast(plain, hash, timestamp);
     }, true);

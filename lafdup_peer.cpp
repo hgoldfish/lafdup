@@ -1,3 +1,4 @@
+#include <QtCore/qdatetime.h>
 #include <QtNetwork/qnetworkinterface.h>
 #include "lafdup_peer.h"
 
@@ -16,15 +17,26 @@ public:
     bool start();
     void stop();
     void serve();
-    void handleRequest(const QByteArray &packet);
-    bool send(const QDateTime &timestamp, const QString &text);
+    void discovery();
+    void handleRequest(const QByteArray &packet, const QHostAddress &addr, quint16 port);
+    void parseAndHandleDataPacket(MsgPackStream &mps, const QHostAddress &addr, quint16 port);
+    void parseAndHandleDetectivePacket(const QHostAddress &addr, quint16 port);
+    bool outgoing(const QDateTime &timestamp, const QString &text);
     void broadcast(const QByteArray &plain, const QByteArray &hash, const QDateTime &timestamp);
+    void sendPacket(const QByteArray &packet);
+    QByteArray makeDataPacketVersion1(QSharedPointer<Cipher> lastCipher,
+                                      const QByteArray &plain, const QByteArray &hash, const QDateTime &timestamp);
+    QByteArray makeDataPacketVersion2(QSharedPointer<Cipher> lastCipher,
+                                      const QByteArray &plain, const QByteArray &hash, const QDateTime &timestamp);
+    QByteArray makeDetectivePacket();
 public:
     QSharedPointer<Socket> socket;
     CoroutineGroup *operations;
     QSharedPointer<Cipher> cipher;
     QList<QHostAddress> knownPeers;
-    QSet<QByteArray> oldHashes;
+    QSet<QPair<QHostAddress, quint16>> extraKnownPeers;
+    QList<QByteArray> oldHashes;
+    quint32 myId;
 private:
     LafdupPeer * const q_ptr;
     Q_DECLARE_PUBLIC(LafdupPeer)
@@ -37,6 +49,8 @@ LafdupPeerPrivate::LafdupPeerPrivate(LafdupPeer *q)
     , q_ptr(q)
 {
     socket->setOption(Socket::BroadcastSocketOption, true);
+    qsrand(static_cast<uint>(QDateTime::currentMSecsSinceEpoch()));
+    myId = static_cast<quint32>(qrand()) & 0xfffffff0;
 }
 
 
@@ -52,14 +66,16 @@ bool LafdupPeerPrivate::start()
     if (!socket->bind(DefaultPort))
         return false;
 
-    QSharedPointer<Coroutine> t = operations->spawnWithName("serve", [this] { serve(); });
-    return !t.isNull();
+    operations->spawnWithName("serve", [this] { serve(); });
+    operations->spawnWithName("discovery", [this] { discovery(); });
+    return true;
 }
 
 
 void LafdupPeerPrivate::stop()
 {
     operations->killall();
+    socket.reset(new Socket(Socket::IPv4Protocol, Socket::UdpSocket));
 }
 
 
@@ -82,24 +98,56 @@ void LafdupPeerPrivate::serve()
         } else if (bs == 0) {
             continue;
         }
-        handleRequest(QByteArray::fromRawData(buf.data(), bs));
+        handleRequest(QByteArray::fromRawData(buf.data(), bs), addr, port);
     }
 }
 
 
-void LafdupPeerPrivate::handleRequest(const QByteArray &packet)
+inline QByteArray concat(const QDateTime &timestamp, const QByteArray &hash)
 {
-    Q_Q(LafdupPeer);
+    return timestamp.toString().toUtf8() + hash;
+}
+
+
+void LafdupPeerPrivate::handleRequest(const QByteArray &packet, const QHostAddress &addr, quint16 port)
+{
     quint16 magicCode;
     quint8 version;
 
     MsgPackStream mps(packet);
     mps >> magicCode >> version;
-    if (magicCode != DefaultPort || version != 1 || mps.status() != MsgPackStream::Ok) {
+    if (magicCode != DefaultPort || (version != 1 && version != 2)|| mps.status() != MsgPackStream::Ok) {
         qDebug() << "invalid packet.";
         return;
     }
 
+    if (version == 1) {
+        parseAndHandleDataPacket(mps, addr, port);
+    } else if (version == 2) {
+        quint32 t;
+        mps >> t;
+        if (mps.status() != MsgPackStream::Ok) {
+            qDebug() << "invalid packet.";
+            return;
+        }
+        quint32 itsId = t & 0xfffffff0;
+        quint32 command = t & 0xf;
+        if (itsId == myId) {
+            return;
+        }
+
+        if (command == 1) {
+            parseAndHandleDataPacket(mps, addr, port);
+        } else if (command == 2) {
+            parseAndHandleDetectivePacket(addr, port);
+        }
+    }
+
+}
+
+
+void LafdupPeerPrivate::parseAndHandleDataPacket(MsgPackStream &mps,  const QHostAddress &addr, quint16 port) {
+    Q_Q(LafdupPeer);
     QDateTime timestamp;
     QByteArray encrypted;
     QByteArray itsHash;
@@ -109,10 +157,11 @@ void LafdupPeerPrivate::handleRequest(const QByteArray &packet)
         return;
     }
 
-    if (oldHashes.contains(itsHash)) {
+
+    if (!oldHashes.isEmpty() && oldHashes.contains(concat(timestamp, itsHash))) {
         return;
     }
-    oldHashes.insert(itsHash);
+    oldHashes.prepend(itsHash);
 
     QByteArray plain;
     if (!cipher.isNull()) {
@@ -135,7 +184,7 @@ void LafdupPeerPrivate::handleRequest(const QByteArray &packet)
         return;
     }
 
-
+    extraKnownPeers.insert(qMakePair(addr, port));
     operations->kill("broadcast");
 
     QPointer<LafdupPeer> self(q);
@@ -148,7 +197,13 @@ void LafdupPeerPrivate::handleRequest(const QByteArray &packet)
 }
 
 
-bool LafdupPeerPrivate::send(const QDateTime &timestamp, const QString &text)
+void LafdupPeerPrivate::parseAndHandleDetectivePacket(const QHostAddress &addr, quint16 port)
+{
+    extraKnownPeers.insert(qMakePair(addr, port));
+}
+
+
+bool LafdupPeerPrivate::outgoing(const QDateTime &timestamp, const QString &text)
 {
     if (text.isEmpty()) {
         return false;
@@ -160,7 +215,7 @@ bool LafdupPeerPrivate::send(const QDateTime &timestamp, const QString &text)
         qDebug() << "cipher is bad.";
         return false;
     }
-    oldHashes.insert(hash);
+    oldHashes.prepend(concat(timestamp, hash));
     operations->spawnWithName("broadcast", [this, plain, hash, timestamp] {
         broadcast(plain, hash, timestamp);
     }, true);
@@ -183,62 +238,158 @@ static QSet<QHostAddress> allBroadcastAddresses()
     return addresses;
 }
 
+
+QByteArray LafdupPeerPrivate::makeDataPacketVersion1(QSharedPointer<Cipher> lastCipher,
+                                                     const QByteArray &plain, const QByteArray &hash,
+                                                     const QDateTime &timestamp)
+{
+    QByteArray packet;
+    QByteArray encrypted;
+    if (lastCipher.isNull()) {
+        encrypted = plain;
+    } else {
+        QScopedPointer<Cipher> outgoingCipher(lastCipher->copy(Cipher::Encrypt));
+        encrypted = outgoingCipher->addData(plain);
+        encrypted.append(outgoingCipher->finalData());
+        if (encrypted.isEmpty()) {
+            qDebug() << "cipher is bad.";
+            return QByteArray();
+        }
+    }
+
+    MsgPackStream mps(&packet, QIODevice::WriteOnly);
+    mps << DefaultPort << static_cast<quint8>(1) << timestamp << hash << encrypted;
+    if (mps.status() != MsgPackStream::Ok) {
+        qDebug() << "can not serialize packet.";
+        return QByteArray();
+    }
+    return packet;
+}
+
+
+QByteArray LafdupPeerPrivate::makeDataPacketVersion2(QSharedPointer<Cipher> lastCipher,
+                                                     const QByteArray &plain, const QByteArray &hash,
+                                                     const QDateTime &timestamp)
+{
+    QByteArray packet;
+    QByteArray encrypted;
+    if (lastCipher.isNull()) {
+        encrypted = plain;
+    } else {
+        QScopedPointer<Cipher> outgoingCipher(lastCipher->copy(Cipher::Encrypt));
+        encrypted = outgoingCipher->addData(plain);
+        encrypted.append(outgoingCipher->finalData());
+        if (encrypted.isEmpty()) {
+            qDebug() << "cipher is bad.";
+            return QByteArray();
+        }
+    }
+
+    MsgPackStream mps(&packet, QIODevice::WriteOnly);
+    quint32 header = myId | 1;
+    mps << DefaultPort << static_cast<quint8>(2) << header << timestamp << hash << encrypted;
+    if (mps.status() != MsgPackStream::Ok) {
+        qDebug() << "can not serialize packet.";
+        return QByteArray();
+    }
+    return packet;
+}
+
+
+QByteArray LafdupPeerPrivate::makeDetectivePacket()
+{
+    QByteArray packet;
+    MsgPackStream mps(&packet, QIODevice::WriteOnly);
+    quint32 header = myId | 2;
+    mps << DefaultPort << static_cast<quint8>(2) << header;
+    if (mps.status() != MsgPackStream::Ok) {
+        qDebug() << "can not serialize packet.";
+        return QByteArray();
+    }
+    return packet;
+}
+
+
 void LafdupPeerPrivate::broadcast(const QByteArray &plain, const QByteArray &hash, const QDateTime &timestamp)
 {
     QSharedPointer<Cipher> lastCipher = cipher;
-    QByteArray packet;
+    QByteArray dataPacketVersion1;
+    QByteArray dataPacketVersion2;
 
     while (true) {
-        if (packet.isEmpty() || lastCipher != cipher) {
-            if (lastCipher != this->cipher) {
-                lastCipher = this->cipher;
-            }
+        bool chiperChanged = lastCipher != cipher;
+        if (chiperChanged) {
+            lastCipher = cipher;
+        }
 
-            QByteArray encrypted;
-            if (cipher.isNull()) {
-                encrypted = plain;
-            } else {
-                QSharedPointer<Cipher> outgoingCipher(this->cipher->copy(Cipher::Encrypt));
-                encrypted = outgoingCipher->addData(plain);
-                encrypted.append(outgoingCipher->finalData());
-                if (encrypted.isEmpty()) {
-                    qDebug() << "cipher is bad.";
-                    return;
-                }
-            }
-
-            MsgPackStream mps(&packet, QIODevice::WriteOnly);
-            mps << DefaultPort << static_cast<quint8>(1) << timestamp << hash << encrypted;
-            if (mps.status() != MsgPackStream::Ok) {
-                qDebug() << "can not serialize packet.";
+        if (dataPacketVersion1.isEmpty() || chiperChanged) {
+            dataPacketVersion1 = makeDataPacketVersion1(lastCipher, plain, hash, timestamp);
+            if (dataPacketVersion1.isEmpty()) {
                 return;
             }
-
-            if (packet.size() >= 1024 * 64) {
+            if (dataPacketVersion1.size() >= 1024 * 64) {
+                qDebug() << "packet is too large to send.";
                 return;
             }
         }
+        if (dataPacketVersion2.isEmpty() || chiperChanged) {
+            dataPacketVersion2 = makeDataPacketVersion2(lastCipher, plain, hash, timestamp);
+            if (dataPacketVersion2.isEmpty()) {
+                return;
+            }
+            if (dataPacketVersion2.size() >= 1024 * 64) {
+                qDebug() << "packet is too large to send.";
+                return;
+            }
+        }
+        sendPacket(dataPacketVersion1);
+        sendPacket(dataPacketVersion2);
+        Coroutine::sleep(1.0f);
+    }
+}
 
-        const QSet<QHostAddress> &broadcastList = allBroadcastAddresses();
-        for (const QHostAddress &addr: broadcastList) {
-            qint32 bs = socket->sendto(packet, addr, DefaultPort);
-            if (bs != packet.size()) {
-                qDebug() << "can not send packet to" << addr;
-            } else {
-                qDebug() << "send to" << addr;
-            }
-        }
-        // prevent undefined behavior if addresses changed while broadcasting.
-        QList<QHostAddress> addresses = this->knownPeers;
-        for (const QHostAddress &addr: addresses) {
-            qint32 bs = socket->sendto(packet, addr, DefaultPort);
-            if (bs != packet.size()) {
-                qDebug() << "can not send packet to" << addr;
-            } else {
-                qDebug() << "send to" << addr;
-            }
-        }
+
+void LafdupPeerPrivate::discovery()
+{
+    QByteArray detectivePacket = makeDetectivePacket();
+    while (true) {
+        sendPacket(detectivePacket);
         Coroutine::sleep(1.0);
+    }
+}
+
+
+void LafdupPeerPrivate::sendPacket(const QByteArray &packet)
+{
+    const QSet<QHostAddress> &broadcastList = allBroadcastAddresses();
+    for (const QHostAddress &addr: broadcastList) {
+        qint32 bs = socket->sendto(packet, addr, DefaultPort);
+        if (bs != packet.size()) {
+            qDebug() << "can not send packet to" << addr;
+        } else {
+            qDebug() << "send to" << addr;
+        }
+    }
+    // prevent undefined behavior if addresses changed while broadcasting.
+    QList<QHostAddress> addresses = this->knownPeers;
+    for (const QHostAddress &addr: addresses) {
+        qint32 bs = socket->sendto(packet, addr, DefaultPort);
+        if (bs != packet.size()) {
+            qDebug() << "can not send packet to" << addr;
+        } else {
+            qDebug() << "send to" << addr;
+        }
+    }
+
+    // prevent undefined behavior if addresses changed while broadcasting.
+    QSet<QPair<QHostAddress, quint16>> extraKnownPeers = this->extraKnownPeers;
+    for (const QPair<QHostAddress, quint16> &extraKnownPeer: extraKnownPeers) {
+        qint32 bs = socket->sendto(packet, extraKnownPeer.first, extraKnownPeer.second);
+        if (bs != packet.size()) {
+            qDebug() << "can not send packet to" << extraKnownPeer.first.toString() << ":" << extraKnownPeer.second;
+        } else {
+            qDebug() << "send to" << extraKnownPeer.first.toString() << ":" << extraKnownPeer.second;
+        }
     }
 }
 
@@ -292,7 +443,7 @@ void LafdupPeer::setKnownPeers(const QList<QHostAddress> &knownPeers)
 bool LafdupPeer::outgoing(const QDateTime &timestamp, const QString &text)
 {
     Q_D(LafdupPeer);
-    return d->send(timestamp, text);
+    return d->outgoing(timestamp, text);
 }
 
 

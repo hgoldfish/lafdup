@@ -11,7 +11,7 @@ class LafdupWindow;
 }
 
 
-class ActionModel;
+class CopyPasteModel;
 class LafdupWindow: public QWidget
 {
     Q_OBJECT
@@ -32,6 +32,9 @@ private slots:
     void setPassword();
     void useOldContent(const QModelIndex &current);
     void onClipboardChanged();
+    void showContextMenu(const QPoint &pos);
+    void copyToRemote();
+    void setToClipboard();
 private:
     void updateMyIP();
     void loadPassword();
@@ -39,7 +42,7 @@ private:
 private:
     Ui::LafdupWindow *ui;
     QSharedPointer<LafdupPeer> peer;
-    ActionModel *actionModel;
+    CopyPasteModel *copyPasteModel;
     QSystemTrayIcon *trayIcon;
     QMenu *trayMenu;
     bool started;

@@ -11,11 +11,11 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>网络剪切板</string>
+   <string>Sync Clipboard</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
    <item>
-    <widget class="QListView" name="lstActions">
+    <widget class="QListView" name="lstCopyPaste">
      <property name="alternatingRowColors">
       <bool>true</bool>
      </property>
@@ -26,7 +26,7 @@
      <item>
       <widget class="QGroupBox" name="groupBox">
        <property name="title">
-        <string>发送内容</string>
+        <string>Send Text</string>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
@@ -35,7 +35,7 @@
         <item>
          <widget class="QPushButton" name="btnSend">
           <property name="text">
-           <string>发送[Ctrl+Enter]</string>
+           <string>Send[Ctrl+Enter]</string>
           </property>
          </widget>
         </item>
@@ -45,13 +45,13 @@
      <item>
       <widget class="QGroupBox" name="groupBox_2">
        <property name="title">
-        <string>配置信息</string>
+        <string>Configuration</string>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
          <widget class="QLabel" name="lblInformation">
           <property name="text">
-           <string>电脑IP:
+           <string>Other Peers:
 192.168.199.2
 10.1.1.2</string>
           </property>
@@ -62,14 +62,14 @@
           <item>
            <widget class="QPushButton" name="btnManageKnownPeer">
             <property name="text">
-             <string>设置手机&amp;IP...</string>
+             <string>Manage Peer IPs</string>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QPushButton" name="btnSetPassword">
             <property name="text">
-             <string>设置密码(&amp;P)...</string>
+             <string>Set &amp;Password</string>
             </property>
            </widget>
           </item>
@@ -81,6 +81,26 @@
     </layout>
    </item>
   </layout>
+  <action name="actionSetToClipboard">
+   <property name="text">
+    <string>Set To &amp;Clipboard</string>
+   </property>
+  </action>
+  <action name="actionCopyToRemote">
+   <property name="text">
+    <string>Copy To &amp;Remote</string>
+   </property>
+  </action>
+  <action name="actionShow">
+   <property name="text">
+    <string>&amp;Show</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>E&amp;xit</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>

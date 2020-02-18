@@ -11,13 +11,13 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>管理IP地址</string>
+   <string>Manage the IP addresses of other Peers</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QLabel" name="lblInformation">
      <property name="text">
-      <string>通常不需要添加手机的IP。只有当手机和电脑的IP位于不同的网段时才需要把手机的IP添加到这里来。</string>
+      <string>Sync Clipboard sends broadcast to your personal computers and mobile phones which connect to the same network as this computer. You might add the IP addresses of your other personal computers or mobile phones here, only if they connect to a different network.</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
@@ -39,7 +39,7 @@
      <item>
       <widget class="QPushButton" name="btnAdd">
        <property name="text">
-        <string>添加(&amp;A)</string>
+        <string>&amp;Add</string>
        </property>
        <property name="default">
         <bool>true</bool>
@@ -49,7 +49,7 @@
      <item>
       <widget class="QPushButton" name="btnRemove">
        <property name="text">
-        <string>删除被选的IP(&amp;R)</string>
+        <string>&amp;Remove Selected IP</string>
        </property>
       </widget>
      </item>

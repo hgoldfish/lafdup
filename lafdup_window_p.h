@@ -1,6 +1,8 @@
 #ifndef LAFDUP_WINDOW_P_H
 #define LAFDUP_WINDOW_P_H
 
+#include <QtCore/qdatetime.h>
+#include <QtCore/qabstractitemmodel.h>
 #include <QtWidgets/qdialog.h>
 
 
@@ -9,37 +11,38 @@ class PasswordDialog;
 class ManagePeersDialog;
 }
 
-enum ActionType
+enum CopyPasteType
 {
     Incoming, Outgoing
 };
 
 
-class Action
+class CopyPaste
 {
 public:
-    Action(ActionType type, QDateTime timestamp, QString text)
+    CopyPaste(CopyPasteType type, QDateTime timestamp, QString text)
         :type(type), timestamp(timestamp), text(text) {}
-    Action() {}
+    CopyPaste() {}
 public:
-    ActionType type;
+    CopyPasteType type;
     QDateTime timestamp;
     QString text;
 };
 
 
-class ActionModel: public QAbstractListModel
+class CopyPasteModel: public QAbstractListModel
 {
 public:
-    ActionModel();
+    CopyPasteModel();
 public:
     int rowCount(const QModelIndex &parent) const override;
     QVariant data(const QModelIndex &index, int role) const override;
 public:
-    bool checkLastAction(const QString &text) const;
-    QModelIndex addAction(ActionType type, const QDateTime &timestamp, const QString &text);
+    bool checkLastCopyPaste(CopyPasteType type, const QString &text) const;
+    QModelIndex addCopyPaste(CopyPasteType type, const QDateTime &timestamp, const QString &text);
+    CopyPaste copyPasteAt(const QModelIndex &index) const;
 private:
-    QList<Action> actions;
+    QList<CopyPaste> copyPasteList;
 };
 
 
@@ -75,7 +78,7 @@ class ManagePeersDialog: public QDialog
     Q_OBJECT
 public:
     ManagePeersDialog(QWidget *parent);
-    ~ManagePeersDialog();
+    virtual ~ManagePeersDialog() override;
 public:
     virtual void accept() override;
 private slots:

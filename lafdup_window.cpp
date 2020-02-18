@@ -16,37 +16,37 @@
 using namespace qtng;
 
 
-ActionModel::ActionModel()
+CopyPasteModel::CopyPasteModel()
 {
 
 }
 
 
-int ActionModel::rowCount(const QModelIndex &parent) const
+int CopyPasteModel::rowCount(const QModelIndex &parent) const
 {
     if (parent.isValid()) {
         return 0;
     } else {
-        return actions.size();
+        return copyPasteList.size();
     }
 }
 
 
-QVariant ActionModel::data(const QModelIndex &index, int role) const
+QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid()) {
         return QVariant();
     }
 
-    const Action &action = actions.at(index.row());
+    const CopyPaste &copyPaste = copyPasteList.at(index.row());
     if (role == Qt::DisplayRole) {
-        const QString &cleanedText = action.text.trimmed().left(128).replace("\n", "").replace("\b*", " ").left(32);
+        const QString &cleanedText = copyPaste.text.trimmed().left(128).replace("\n", "").replace("\b*", " ").left(32);
         const QString &text = QStringLiteral("%2\n%1")
-                .arg(action.timestamp.time().toString(Qt::ISODate))
+                .arg(copyPaste.timestamp.time().toString(Qt::ISODate))
                 .arg(cleanedText.isEmpty() ? tr("<Spaces>") : cleanedText);
         return text;
     } else if (role == Qt::DecorationRole) {
-        if (action.type == ActionType::Incoming) {
+        if (copyPaste.type == CopyPasteType::Incoming) {
             return QIcon(":/images/ic_file_download_black_48dp.png").pixmap(QSize(32, 32));
         } else {
             return QIcon(":/images/ic_file_upload_black_48dp.png").pixmap(QSize(32, 32));;
@@ -57,26 +57,39 @@ QVariant ActionModel::data(const QModelIndex &index, int role) const
 }
 
 
-bool ActionModel::checkLastAction(const QString &text) const
+bool CopyPasteModel::checkLastCopyPaste(CopyPasteType type, const QString &text) const
 {
-    if (actions.isEmpty()) {
+    if (copyPasteList.isEmpty()) {
         return false;
     }
-    return actions.at(0).text == text;
+    const CopyPaste &action = copyPasteList.first();
+    if (action.type != type) {
+        return false;
+    }
+    return action.text == text;
 }
 
 
-QModelIndex ActionModel::addAction(ActionType type, const QDateTime &timestamp, const QString &text)
+QModelIndex CopyPasteModel::addCopyPaste(CopyPasteType type, const QDateTime &timestamp, const QString &text)
 {
-    for (const Action &action: actions) {
+    for (const CopyPaste &action: copyPasteList) {
         if (action.type == type && action.timestamp == timestamp && action.text == text) {
             return QModelIndex();
         }
     }
     beginInsertRows(QModelIndex(), 0, 0);
-    actions.prepend(Action(type, timestamp, text));
+    copyPasteList.prepend(CopyPaste(type, timestamp, text));
     endInsertRows();
     return createIndex(0, 0);
+}
+
+
+CopyPaste CopyPasteModel::copyPasteAt(const QModelIndex &index) const
+{
+    if (index.isValid()) {
+        return copyPasteList.at(index.row());
+    }
+    return CopyPaste();
 }
 
 
@@ -107,21 +120,23 @@ bool CtrlEnterListener::eventFilter(QObject *, QEvent *event)
 LafdupWindow::LafdupWindow()
     : ui(new Ui::LafdupWindow())
     , peer(new LafdupPeer())
-    , actionModel(new ActionModel())
+    , copyPasteModel(new CopyPasteModel())
     , trayIcon(new QSystemTrayIcon())
 {
-    qDebug() << "hello!";
     ui->setupUi(this);
     ui->txtContent->installEventFilter(new CtrlEnterListener(this));
 
     trayMenu = new QMenu();
-    QAction *actionShow = trayMenu->addAction(tr("&Show"));
-    QAction *actionExit = trayMenu->addAction(tr("E&xit"));
+    trayMenu->addAction(ui->actionShow);
+    trayMenu->addAction(ui->actionExit);
     trayIcon->setIcon(QIcon(":/images/bluefish.png"));
     trayIcon->setContextMenu(trayMenu);
     trayIcon->show();
 
-    ui->lstActions->setModel(actionModel);
+    ui->lstCopyPaste->setModel(copyPasteModel);
+    ui->lstCopyPaste->setContextMenuPolicy(Qt::ContextMenuPolicy::CustomContextMenu);
+    connect(ui->lstCopyPaste, SIGNAL(customContextMenuRequested(QPoint)), SLOT(showContextMenu(QPoint)));
+    connect(ui->lstCopyPaste, SIGNAL(activated(QModelIndex)), SLOT(setToClipboard()));
 
     connect(ui->btnManageKnownPeer, SIGNAL(clicked(bool)), SLOT(managePeers()));
     connect(ui->btnSend, SIGNAL(clicked(bool)), SLOT(sendContent()));
@@ -129,8 +144,10 @@ LafdupWindow::LafdupWindow()
     connect(peer.data(), SIGNAL(incoming(QDateTime,QString)), SLOT(updateClipboard(QDateTime,QString)));
     connect(peer.data(), SIGNAL(stateChanged(bool)), SLOT(onPeerStateChanged(bool)));
     connect(trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)), SLOT(showAndGetFocus()));
-    connect(actionShow, SIGNAL(triggered(bool)), SLOT(showAndGetFocus()));
-    connect(actionExit, SIGNAL(triggered(bool)), QCoreApplication::instance(), SLOT(quit()));
+    connect(ui->actionShow, SIGNAL(triggered(bool)), SLOT(showAndGetFocus()));
+    connect(ui->actionExit, SIGNAL(triggered(bool)), QCoreApplication::instance(), SLOT(quit()));
+    connect(ui->actionCopyToRemote, SIGNAL(triggered(bool)), SLOT(copyToRemote()));
+    connect(ui->actionSetToClipboard, SIGNAL(triggered(bool)), SLOT(setToClipboard()));
 
     const QClipboard *clipboard = QApplication::clipboard();
     connect(clipboard, SIGNAL(dataChanged()), SLOT(onClipboardChanged()));
@@ -146,7 +163,7 @@ LafdupWindow::~LafdupWindow()
     delete trayMenu;
     delete trayIcon;
     delete ui;
-    delete actionModel;
+    delete copyPasteModel;
 }
 
 
@@ -195,9 +212,10 @@ void LafdupWindow::sendContent()
     bool ok = peer->outgoing(now, text);
     if (!ok) {
         QMessageBox::information(this, windowTitle(), tr("Can not send content."));
+        return;
     }
-    const QModelIndex &current = actionModel->addAction(ActionType::Outgoing, now, text);
-    ui->lstActions->setCurrentIndex(current);
+    const QModelIndex &current = copyPasteModel->addCopyPaste(CopyPasteType::Outgoing, now, text);
+    ui->lstCopyPaste->setCurrentIndex(current);
     ui->txtContent->clear();
     ui->txtContent->setFocus();
 }
@@ -210,17 +228,18 @@ void LafdupWindow::onClipboardChanged()
     if (text.isEmpty()) {
         return;
     }
-    bool found = actionModel->checkLastAction(text);
+    bool found = copyPasteModel->checkLastCopyPaste(CopyPasteType::Incoming, text);
     if (found) {
         return;
     }
     const QDateTime &now = QDateTime::currentDateTime();
     bool ok = peer->outgoing(now, text);
     if (!ok) {
-        QMessageBox::information(this, windowTitle(), tr("Can not send content."));
+        //QMessageBox::information(this, windowTitle(), tr("Can not send content."));
+        return;
     }
-    const QModelIndex &current = actionModel->addAction(ActionType::Outgoing, now, text);
-    ui->lstActions->setCurrentIndex(current);
+    const QModelIndex &current = copyPasteModel->addCopyPaste(CopyPasteType::Outgoing, now, text);
+    ui->lstCopyPaste->setCurrentIndex(current);
     ui->txtContent->clear();
     ui->txtContent->setFocus();
 }
@@ -228,10 +247,61 @@ void LafdupWindow::onClipboardChanged()
 
 void LafdupWindow::updateClipboard(const QDateTime &timestamp, const QString &text)
 {
-    const QModelIndex &current = actionModel->addAction(ActionType::Incoming, timestamp, text);
+    const QModelIndex &current = copyPasteModel->addCopyPaste(CopyPasteType::Incoming, timestamp, text);
     if (current.isValid()) {
-        ui->lstActions->setCurrentIndex(current);
+        ui->lstCopyPaste->setCurrentIndex(current);
         QApplication::clipboard()->setText(text);
+    }
+}
+
+
+void LafdupWindow::showContextMenu(const QPoint &)
+{
+    const QModelIndex &current = ui->lstCopyPaste->currentIndex();
+    if (!current.isValid()) {
+        return;
+    }
+    QMenu menu;
+    menu.addAction(ui->actionSetToClipboard);
+    menu.addAction(ui->actionCopyToRemote);
+    menu.exec(QCursor::pos());
+}
+
+
+void LafdupWindow::copyToRemote()
+{
+    const QModelIndex &current = ui->lstCopyPaste->currentIndex();
+    if (!current.isValid()) {
+        return;
+    }
+    const CopyPaste &copyPaste = copyPasteModel->copyPasteAt(current);
+    if (copyPaste.text.isEmpty()) {
+        return;
+    }
+
+    const QDateTime &now = QDateTime::currentDateTime();
+    bool ok = peer->outgoing(now, copyPaste.text);
+    if (!ok) {
+        //QMessageBox::information(this, windowTitle(), tr("Can not send content."));
+        return;
+    }
+    const QModelIndex &t = copyPasteModel->addCopyPaste(CopyPasteType::Outgoing, now, copyPaste.text);
+    ui->lstCopyPaste->setCurrentIndex(t);
+}
+
+
+void LafdupWindow::setToClipboard()
+{
+    const QModelIndex &current = ui->lstCopyPaste->currentIndex();
+    if (!current.isValid()) {
+        return;
+    }
+    const CopyPaste &copyPaste = copyPasteModel->copyPasteAt(current);
+    if (!copyPaste.text.isEmpty()) {
+        const QClipboard *clipboard = QApplication::clipboard();
+        disconnect(clipboard, SIGNAL(dataChanged()), this, SLOT(onClipboardChanged()));
+        QApplication::clipboard()->setText(copyPaste.text);
+        connect(clipboard, SIGNAL(dataChanged()), SLOT(onClipboardChanged()));
     }
 }
 
@@ -323,6 +393,7 @@ void moveToCenter(QWidget * const widget)
     r.moveCenter(QApplication::desktop()->screenGeometry().center());
     widget->setGeometry(r);
 }
+
 
 void LafdupWindow::showAndGetFocus()
 {

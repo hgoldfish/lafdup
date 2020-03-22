@@ -93,6 +93,28 @@ CopyPaste CopyPasteModel::copyPasteAt(const QModelIndex &index) const
 }
 
 
+bool CopyPasteModel::removeCopyPaste(const QModelIndex &index)
+{
+    if (index.isValid()) {
+        beginRemoveRows(QModelIndex(), index.row(), index.row());
+        copyPasteList.removeAt(index.row());
+        endRemoveRows();
+        return true;
+    }
+    return false;
+}
+
+
+void CopyPasteModel::clearAll()
+{
+    if (!copyPasteList.isEmpty()) {
+        beginResetModel();
+        copyPasteList.clear();
+        endResetModel();
+    }
+}
+
+
 class CtrlEnterListener: public QObject
 {
 public:
@@ -148,6 +170,8 @@ LafdupWindow::LafdupWindow()
     connect(ui->actionExit, SIGNAL(triggered(bool)), QCoreApplication::instance(), SLOT(quit()));
     connect(ui->actionCopyToRemote, SIGNAL(triggered(bool)), SLOT(copyToRemote()));
     connect(ui->actionSetToClipboard, SIGNAL(triggered(bool)), SLOT(setToClipboard()));
+    connect(ui->actionRemove, SIGNAL(triggered(bool)), SLOT(removeCopyPaste()));
+    connect(ui->actionClearAll, SIGNAL(triggered(bool)), SLOT(clearAll()));
 
     const QClipboard *clipboard = QApplication::clipboard();
     connect(clipboard, SIGNAL(dataChanged()), SLOT(onClipboardChanged()));
@@ -264,6 +288,9 @@ void LafdupWindow::showContextMenu(const QPoint &)
     QMenu menu;
     menu.addAction(ui->actionSetToClipboard);
     menu.addAction(ui->actionCopyToRemote);
+    menu.addSeparator();
+    menu.addAction(ui->actionRemove);
+    menu.addAction(ui->actionClearAll);
     menu.exec(QCursor::pos());
 }
 
@@ -306,6 +333,22 @@ void LafdupWindow::setToClipboard()
 }
 
 
+void LafdupWindow::removeCopyPaste()
+{
+    const QModelIndex &current = ui->lstCopyPaste->currentIndex();
+    if (!current.isValid()) {
+        return;
+    }
+    copyPasteModel->removeCopyPaste(current);
+}
+
+
+void LafdupWindow::clearAll()
+{
+    copyPasteModel->clearAll();
+}
+
+
 void LafdupWindow::onPeerStateChanged(bool ok)
 {
     if (!ok) {
@@ -342,7 +385,8 @@ void LafdupWindow::useOldContent(const QModelIndex &current)
 
 void LafdupWindow::updateMyIP()
 {
-    QString text = QStringLiteral("IP Addresses:\n");
+    QString text = tr("My IP Addresses:");
+    text.append("\n");
     for (const QString &ip: peer->getAllBoundAddresses()) {
         text.append(ip);
         text.append("\n");
@@ -390,7 +434,7 @@ void LafdupWindow::loadKnownPeers()
 void moveToCenter(QWidget * const widget)
 {
     QRect r = widget->geometry();
-    r.moveCenter(QApplication::desktop()->screenGeometry().center());
+    r.moveCenter(QApplication::desktop()->screenGeometry(widget).center());
     widget->setGeometry(r);
 }
 

@@ -354,7 +354,7 @@ void LafdupPeerPrivate::discovery()
     QByteArray detectivePacket = makeDetectivePacket();
     while (true) {
         sendPacket(detectivePacket);
-        Coroutine::sleep(1.0);
+        Coroutine::sleep(5.0);
     }
 }
 

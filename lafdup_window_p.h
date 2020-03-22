@@ -41,6 +41,8 @@ public:
     bool checkLastCopyPaste(CopyPasteType type, const QString &text) const;
     QModelIndex addCopyPaste(CopyPasteType type, const QDateTime &timestamp, const QString &text);
     CopyPaste copyPasteAt(const QModelIndex &index) const;
+    bool removeCopyPaste(const QModelIndex &index);
+    void clearAll();
 private:
     QList<CopyPaste> copyPasteList;
 };

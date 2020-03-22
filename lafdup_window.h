@@ -35,6 +35,8 @@ private slots:
     void showContextMenu(const QPoint &pos);
     void copyToRemote();
     void setToClipboard();
+    void removeCopyPaste();
+    void clearAll();
 private:
     void updateMyIP();
     void loadPassword();

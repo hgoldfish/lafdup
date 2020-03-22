@@ -101,6 +101,22 @@
     <string>E&amp;xit</string>
    </property>
   </action>
+  <action name="actionClearAll">
+   <property name="text">
+    <string>Clear All</string>
+   </property>
+   <property name="toolTip">
+    <string>Clear All Items</string>
+   </property>
+  </action>
+  <action name="actionRemove">
+   <property name="text">
+    <string>Remove</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove Selected Item</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>

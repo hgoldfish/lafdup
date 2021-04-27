@@ -419,9 +419,9 @@ void LafdupWindow::loadKnownPeers()
     QSettings settings;
     const QStringList &knownPeers = settings.value("known_peers").toStringList();
     if (!knownPeers.isEmpty()) {
-        QList<QHostAddress> addresses;
+        QList<HostAddress> addresses;
         for (int i = 0; i < knownPeers.size(); ++i) {
-            QHostAddress addr(knownPeers.at(i));
+            HostAddress addr(knownPeers.at(i));
             if (!addr.isNull()) {
                 addresses.append(addr);
             }
@@ -566,7 +566,7 @@ void ManagePeersDialog::accept()
 void ManagePeersDialog::addPeer()
 {
     const QString &ip = ui->txtIP->text();
-    QHostAddress addr(ip);
+    HostAddress addr(ip);
     if (addr.isNull()) {
         QMessageBox::information(this, windowTitle(), tr("%1 is not a valid IP.").arg(ip));
         ui->txtIP->selectAll();

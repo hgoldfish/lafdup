@@ -18,9 +18,9 @@ public:
     void stop();
     void serve();
     void discovery();
-    void handleRequest(const QByteArray &packet, const QHostAddress &addr, quint16 port);
-    void parseAndHandleDataPacket(MsgPackStream &mps, const QHostAddress &addr, quint16 port);
-    void parseAndHandleDetectivePacket(const QHostAddress &addr, quint16 port);
+    void handleRequest(const QByteArray &packet, const HostAddress &addr, quint16 port);
+    void parseAndHandleDataPacket(MsgPackStream &mps, const HostAddress &addr, quint16 port);
+    void parseAndHandleDetectivePacket(const HostAddress &addr, quint16 port);
     bool outgoing(const QDateTime &timestamp, const QString &text);
     void broadcast(const QByteArray &plain, const QByteArray &hash, const QDateTime &timestamp);
     void sendPacket(const QByteArray &packet);
@@ -33,8 +33,8 @@ public:
     QSharedPointer<Socket> socket;
     CoroutineGroup *operations;
     QSharedPointer<Cipher> cipher;
-    QList<QHostAddress> knownPeers;
-    QSet<QPair<QHostAddress, quint16>> extraKnownPeers;
+    QList<HostAddress> knownPeers;
+    QSet<QPair<HostAddress, quint16>> extraKnownPeers;
     QList<QByteArray> oldHashes;
     quint32 myId;
 private:
@@ -44,7 +44,7 @@ private:
 
 
 LafdupPeerPrivate::LafdupPeerPrivate(LafdupPeer *q)
-    : socket(new Socket(Socket::IPv4Protocol, Socket::UdpSocket))
+    : socket(new Socket(HostAddress::IPv4Protocol, Socket::UdpSocket))
     , operations(new CoroutineGroup)
     , q_ptr(q)
 {
@@ -75,14 +75,14 @@ bool LafdupPeerPrivate::start()
 void LafdupPeerPrivate::stop()
 {
     operations->killall();
-    socket.reset(new Socket(Socket::IPv4Protocol, Socket::UdpSocket));
+    socket.reset(new Socket(HostAddress::IPv4Protocol, Socket::UdpSocket));
 }
 
 
 void LafdupPeerPrivate::serve()
 {
     Q_Q(LafdupPeer);
-    QHostAddress addr;
+    HostAddress addr;
     quint16 port;
     QByteArray buf(1024 * 64, Qt::Uninitialized);
     QPointer<LafdupPeer> self(q);
@@ -109,7 +109,7 @@ inline QByteArray concat(const QDateTime &timestamp, const QByteArray &hash)
 }
 
 
-void LafdupPeerPrivate::handleRequest(const QByteArray &packet, const QHostAddress &addr, quint16 port)
+void LafdupPeerPrivate::handleRequest(const QByteArray &packet, const HostAddress &addr, quint16 port)
 {
     quint16 magicCode;
     quint8 version;
@@ -146,7 +146,7 @@ void LafdupPeerPrivate::handleRequest(const QByteArray &packet, const QHostAddre
 }
 
 
-void LafdupPeerPrivate::parseAndHandleDataPacket(MsgPackStream &mps,  const QHostAddress &addr, quint16 port) {
+void LafdupPeerPrivate::parseAndHandleDataPacket(MsgPackStream &mps,  const HostAddress &addr, quint16 port) {
     Q_Q(LafdupPeer);
     QDateTime timestamp;
     QByteArray encrypted;
@@ -197,7 +197,7 @@ void LafdupPeerPrivate::parseAndHandleDataPacket(MsgPackStream &mps,  const QHos
 }
 
 
-void LafdupPeerPrivate::parseAndHandleDetectivePacket(const QHostAddress &addr, quint16 port)
+void LafdupPeerPrivate::parseAndHandleDetectivePacket(const HostAddress &addr, quint16 port)
 {
     extraKnownPeers.insert(qMakePair(addr, port));
 }
@@ -223,13 +223,13 @@ bool LafdupPeerPrivate::outgoing(const QDateTime &timestamp, const QString &text
 }
 
 
-static QSet<QHostAddress> allBroadcastAddresses()
+static QSet<HostAddress> allBroadcastAddresses()
 {
-    QSet<QHostAddress> addresses;
-    addresses.insert(QHostAddress::Broadcast);
+    QSet<HostAddress> addresses;
+    addresses.insert(HostAddress::Broadcast);
     for (const QNetworkInterface &interface: QNetworkInterface::allInterfaces()) {
         for (const QNetworkAddressEntry &entry: interface.addressEntries()) {
-            const QHostAddress &addr = entry.broadcast();
+            const HostAddress &addr = entry.broadcast();
             if (!addr.isNull()) {
                 addresses.insert(addr);
             }
@@ -361,8 +361,8 @@ void LafdupPeerPrivate::discovery()
 
 void LafdupPeerPrivate::sendPacket(const QByteArray &packet)
 {
-    const QSet<QHostAddress> &broadcastList = allBroadcastAddresses();
-    for (const QHostAddress &addr: broadcastList) {
+    const QSet<HostAddress> &broadcastList = allBroadcastAddresses();
+    for (const HostAddress &addr: broadcastList) {
         qint32 bs = socket->sendto(packet, addr, DefaultPort);
         if (bs != packet.size()) {
             qDebug() << "can not send packet to" << addr;
@@ -371,8 +371,8 @@ void LafdupPeerPrivate::sendPacket(const QByteArray &packet)
         }
     }
     // prevent undefined behavior if addresses changed while broadcasting.
-    QList<QHostAddress> addresses = this->knownPeers;
-    for (const QHostAddress &addr: addresses) {
+    QList<HostAddress> addresses = this->knownPeers;
+    for (const HostAddress &addr: addresses) {
         qint32 bs = socket->sendto(packet, addr, DefaultPort);
         if (bs != packet.size()) {
             qDebug() << "can not send packet to" << addr;
@@ -382,8 +382,8 @@ void LafdupPeerPrivate::sendPacket(const QByteArray &packet)
     }
 
     // prevent undefined behavior if addresses changed while broadcasting.
-    QSet<QPair<QHostAddress, quint16>> extraKnownPeers = this->extraKnownPeers;
-    for (const QPair<QHostAddress, quint16> &extraKnownPeer: extraKnownPeers) {
+    QSet<QPair<HostAddress, quint16>> extraKnownPeers = this->extraKnownPeers;
+    for (const QPair<HostAddress, quint16> &extraKnownPeer: extraKnownPeers) {
         qint32 bs = socket->sendto(packet, extraKnownPeer.first, extraKnownPeer.second);
         if (bs != packet.size()) {
             qDebug() << "can not send packet to" << extraKnownPeer.first.toString() << ":" << extraKnownPeer.second;
@@ -433,7 +433,7 @@ QSharedPointer<Cipher> LafdupPeer::cipher() const
 }
 
 
-void LafdupPeer::setKnownPeers(const QList<QHostAddress> &knownPeers)
+void LafdupPeer::setKnownPeers(const QList<HostAddress> &knownPeers)
 {
     Q_D(LafdupPeer);
     d->knownPeers = knownPeers;
@@ -450,8 +450,8 @@ bool LafdupPeer::outgoing(const QDateTime &timestamp, const QString &text)
 QStringList LafdupPeer::getAllBoundAddresses()
 {
     QStringList addresses;
-    for (const QHostAddress &addr: QNetworkInterface::allAddresses()) {
-        if (!addr.isLoopback() && !addr.isMulticast() && addr.protocol() == QAbstractSocket::IPv4Protocol) {
+    for (const HostAddress &addr: QNetworkInterface::allAddresses()) {
+        if (!addr.isLoopback() && !addr.isMulticast() && addr.protocol() == HostAddress::IPv4Protocol) {
             addresses.append(addr.toString());
         }
     }

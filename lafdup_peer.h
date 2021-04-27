@@ -1,7 +1,6 @@
 #ifndef LAFDUP_PEER_H
 #define LAFDUP_PEER_H
 #include <QtCore/qobject.h>
-#include <QtNetwork/qhostaddress.h>
 #include "qtnetworkng.h"
 
 class LafdupPeerPrivate;
@@ -16,7 +15,7 @@ public:
     void stop();
     void setCipher(QSharedPointer<qtng::Cipher> cipher);
     QSharedPointer<qtng::Cipher> cipher() const;
-    void setKnownPeers(const QList<QHostAddress> &knownPeers);
+    void setKnownPeers(const QList<qtng::HostAddress> &knownPeers);
     QStringList getAllBoundAddresses();
     quint16 getPort();
 signals:

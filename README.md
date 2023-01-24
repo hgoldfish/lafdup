@@ -34,6 +34,7 @@ Using cmake to build this project.
     $ git clone https://github.com/hgoldfish/lafdup.git
     $ cd lafdup
     $ git clone https://github.com/hgoldfish/lafrpc.git
+    $ git clone https://github.com/hgoldfish/qtnetworkng.git
     $ mkdir build
     $ cd build
     $ cmake ..

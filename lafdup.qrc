@@ -1,7 +1,13 @@
 <RCC>
-    <qresource prefix="/">
-        <file>images/ic_file_upload_black_48dp.png</file>
-        <file>images/ic_file_download_black_48dp.png</file>
-        <file>images/bluefish.png</file>
-    </qresource>
+  <qresource prefix="/">
+    <file>images/alipay_code.jpg</file>
+    <file>images/application-vnd.wordperfect.png</file>
+    <file>images/document-encrypt.png</file>
+    <file>images/network-wireless-connected-100.png</file>
+    <file>images/klipper.png</file>
+    <file>images/configure.png</file>
+    <file>images/ic_file_upload_black_48dp.png</file>
+    <file>images/ic_file_download_black_48dp.png</file>
+    <file>images/bluefish.png</file>
+  </qresource>
 </RCC>

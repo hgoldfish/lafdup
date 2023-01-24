@@ -4,30 +4,12 @@
 #include <QtCore/qdatetime.h>
 #include <QtCore/qabstractitemmodel.h>
 #include <QtWidgets/qdialog.h>
-
+#include "lafdup_window.h"
 
 namespace Ui {
 class PasswordDialog;
-class ManagePeersDialog;
+class ConfigureDialog;
 }
-
-enum CopyPasteType
-{
-    Incoming, Outgoing
-};
-
-
-class CopyPaste
-{
-public:
-    CopyPaste(CopyPasteType type, QDateTime timestamp, QString text)
-        :type(type), timestamp(timestamp), text(text) {}
-    CopyPaste() {}
-public:
-    CopyPasteType type;
-    QDateTime timestamp;
-    QString text;
-};
 
 
 class CopyPasteModel: public QAbstractListModel
@@ -38,8 +20,8 @@ public:
     int rowCount(const QModelIndex &parent) const override;
     QVariant data(const QModelIndex &index, int role) const override;
 public:
-    bool checkLastCopyPaste(CopyPasteType type, const QString &text) const;
-    QModelIndex addCopyPaste(CopyPasteType type, const QDateTime &timestamp, const QString &text);
+//    bool checkLastCopyPaste(CopyPaste::Direction direction, const QString &text) const;
+    QModelIndex addCopyPaste(const CopyPaste &copyPaste);
     CopyPaste copyPasteAt(const QModelIndex &index) const;
     bool removeCopyPaste(const QModelIndex &index);
     void clearAll();
@@ -75,19 +57,27 @@ private:
 };
 
 
-class ManagePeersDialog: public QDialog
+class ConfigureDialog: public QDialog
 {
     Q_OBJECT
 public:
-    ManagePeersDialog(QWidget *parent);
-    virtual ~ManagePeersDialog() override;
+    ConfigureDialog(QWidget *parent);
+    virtual ~ConfigureDialog() override;
 public:
     virtual void accept() override;
+    bool isPasswordChanged();
 private slots:
+    void onCacheDirectoryChanged(const QString &text);
+    void selectCacheDirectory();
+    void onDeleteFilesChanged(bool checked);
+    void onSendFilesChanged(bool checked);
+    void onOnlySendSmallFileChanged(bool checked);
     void removeSelectedPeer();
     void addPeer();
 private:
-    Ui::ManagePeersDialog *ui;
+    void loadSettings();
+private:
+    Ui::ConfigureDialog *ui;
     PeerModel *peerModel;
 };
 

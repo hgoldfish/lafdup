@@ -1,16 +1,18 @@
 #include <QtCore/qabstractitemmodel.h>
 #include <QtCore/qsettings.h>
 #include <QtCore/qtimer.h>
+#include <QtCore/qmimedata.h>
+#include <QtCore/qbuffer.h>
 #include <QtGui/qevent.h>
 #include <QtGui/qclipboard.h>
 #include <QtWidgets/qmessagebox.h>
 #include <QtWidgets/qmenu.h>
 #include <QtWidgets/qdesktopwidget.h>
-#include "lafdup_window.h"
+#include <QtWidgets/qfiledialog.h>
 #include "lafdup_window_p.h"
 #include "ui_main.h"
 #include "ui_password.h"
-#include "ui_peers.h"
+#include "ui_configure.h"
 
 
 using namespace qtng;
@@ -40,13 +42,25 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
 
     const CopyPaste &copyPaste = copyPasteList.at(index.row());
     if (role == Qt::DisplayRole) {
-        const QString &cleanedText = copyPaste.text.trimmed().left(128).replace("\n", "").replace("\b*", " ").left(32);
-        const QString &text = QStringLiteral("%2\n%1")
-                .arg(copyPaste.timestamp.time().toString(Qt::ISODate))
-                .arg(cleanedText.isEmpty() ? tr("<Spaces>") : cleanedText);
-        return text;
+        if (copyPaste.isText()) {
+            const QString &cleanedText = copyPaste.text.trimmed().left(128).replace("\n", "").replace("\b*", " ").left(32);
+            const QString &text = QStringLiteral("%2\n%1")
+                    .arg(copyPaste.timestamp.time().toString(Qt::ISODate))
+                    .arg(cleanedText.isEmpty() ? tr("<Spaces>") : cleanedText);
+            return text;
+        } else if (copyPaste.isFile()) {
+            QStringList fileNames;
+            for (const QString &path: copyPaste.files) {
+                QFileInfo fileInfo(path);
+                fileNames.append(fileInfo.fileName());
+            }
+            return fileNames.join(",");
+        } else if (copyPaste.isImage()) {
+            return "Image";
+        }
     } else if (role == Qt::DecorationRole) {
-        if (copyPaste.type == CopyPasteType::Incoming) {
+        // TODO support dark theme.
+        if (copyPaste.direction == CopyPaste::Incoming) {
             return QIcon(":/images/ic_file_download_black_48dp.png").pixmap(QSize(32, 32));
         } else {
             return QIcon(":/images/ic_file_upload_black_48dp.png").pixmap(QSize(32, 32));;
@@ -57,28 +71,28 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
 }
 
 
-bool CopyPasteModel::checkLastCopyPaste(CopyPasteType type, const QString &text) const
-{
-    if (copyPasteList.isEmpty()) {
-        return false;
-    }
-    const CopyPaste &action = copyPasteList.first();
-    if (action.type != type) {
-        return false;
-    }
-    return action.text == text;
-}
+//bool CopyPasteModel::checkLastCopyPaste(CopyPaste::Direction direction, const QString &text) const
+//{
+//    if (copyPasteList.isEmpty()) {
+//        return false;
+//    }
+//    const CopyPaste &action = copyPasteList.first();
+//    if (action.direction != direction) {
+//        return false;
+//    }
+//    return action.textOrPath == text;
+//}
 
 
-QModelIndex CopyPasteModel::addCopyPaste(CopyPasteType type, const QDateTime &timestamp, const QString &text)
+QModelIndex CopyPasteModel::addCopyPaste(const CopyPaste &copyPaste)
 {
-    for (const CopyPaste &action: copyPasteList) {
-        if (action.type == type && action.timestamp == timestamp && action.text == text) {
+    for (const CopyPaste &old: copyPasteList) {
+        if (old.direction == copyPaste.direction && old.timestamp == copyPaste.timestamp) {
             return QModelIndex();
         }
     }
     beginInsertRows(QModelIndex(), 0, 0);
-    copyPasteList.prepend(CopyPaste(type, timestamp, text));
+    copyPasteList.prepend(copyPaste);
     endInsertRows();
     return createIndex(0, 0);
 }
@@ -141,7 +155,7 @@ bool CtrlEnterListener::eventFilter(QObject *, QEvent *event)
 
 LafdupWindow::LafdupWindow()
     : ui(new Ui::LafdupWindow())
-    , peer(new LafdupPeer())
+    , peer(new LafdupPeer(lafrpc::createUuid(), LafdupPeer::getDefaultPort()))
     , copyPasteModel(new CopyPasteModel())
     , trayIcon(new QSystemTrayIcon())
 {
@@ -160,11 +174,9 @@ LafdupWindow::LafdupWindow()
     connect(ui->lstCopyPaste, SIGNAL(customContextMenuRequested(QPoint)), SLOT(showContextMenu(QPoint)));
     connect(ui->lstCopyPaste, SIGNAL(activated(QModelIndex)), SLOT(setToClipboard()));
 
-    connect(ui->btnManageKnownPeer, SIGNAL(clicked(bool)), SLOT(managePeers()));
-    connect(ui->btnSend, SIGNAL(clicked(bool)), SLOT(sendContent()));
-    connect(ui->btnSetPassword, SIGNAL(clicked(bool)), SLOT(setPassword()));
-    connect(peer.data(), SIGNAL(incoming(QDateTime,QString)), SLOT(updateClipboard(QDateTime,QString)));
-    connect(peer.data(), SIGNAL(stateChanged(bool)), SLOT(onPeerStateChanged(bool)));
+    connect(ui->btnConfigure, SIGNAL(clicked()), SLOT(configure()));
+    connect(ui->btnSendText, SIGNAL(clicked(bool)), SLOT(sendContent()));
+    connect(ui->btnSendFiles, SIGNAL(clicked(bool)), SLOT(sendFiles()));
     connect(trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)), SLOT(showAndGetFocus()));
     connect(ui->actionShow, SIGNAL(triggered(bool)), SLOT(showAndGetFocus()));
     connect(ui->actionExit, SIGNAL(triggered(bool)), QCoreApplication::instance(), SLOT(quit()));
@@ -173,12 +185,15 @@ LafdupWindow::LafdupWindow()
     connect(ui->actionRemove, SIGNAL(triggered(bool)), SLOT(removeCopyPaste()));
     connect(ui->actionClearAll, SIGNAL(triggered(bool)), SLOT(clearAll()));
 
-    const QClipboard *clipboard = QApplication::clipboard();
+    QClipboard *clipboard = QApplication::clipboard();
     connect(clipboard, SIGNAL(dataChanged()), SLOT(onClipboardChanged()));
 
-    loadPassword();
-    loadKnownPeers();
+    connect(peer.data(), &LafdupPeer::stateChanged, this, &LafdupWindow::onPeerStateChanged);
+    connect(peer.data(), &LafdupPeer::incoming, this, &LafdupWindow::updateClipboard);
+
+    loadConfiguration(true);
     started = peer->start();
+    setAcceptDrops(true);
 }
 
 
@@ -219,7 +234,116 @@ void LafdupWindow::changeEvent(QEvent *event)
 void LafdupWindow::closeEvent(QCloseEvent *event)
 {
     QWidget::closeEvent(event);
-    QCoreApplication::instance()->quit();
+    QTimer::singleShot(0, QCoreApplication::instance(), SLOT(quit()));
+}
+
+
+void LafdupWindow::dropEvent(QDropEvent *event)
+{
+    const QMimeData* mimeData = event->mimeData();
+    if (mimeData->hasUrls()) {
+        outgoing(mimeData->urls(), true, true);
+        event->acceptProposedAction();
+    }
+}
+
+
+void LafdupWindow::dragEnterEvent(QDragEnterEvent *event)
+{
+    const QMimeData* mimeData = event->mimeData();
+    if (mimeData->hasUrls()) {
+        event->acceptProposedAction();
+    }
+}
+
+
+bool LafdupWindow::outgoing(const QString &text, bool ignoreLimits)
+{
+    const QDateTime &now = QDateTime::currentDateTime();
+    CopyPaste copyPaste;
+    copyPaste.direction = CopyPaste::Outgoing;
+    copyPaste.mimeType = TextType;
+    copyPaste.text = text;
+    copyPaste.timestamp = now;
+    copyPaste.ignoreLimits = ignoreLimits;
+    peer->outgoing(copyPaste);
+    return true;
+}
+
+
+bool LafdupWindow::outgoing(const QList<QUrl> urls, bool showError, bool ignoreLimits)
+{
+    if (urls.isEmpty()) {
+        return false;
+    }
+    bool notLocal = false;
+    bool fileMoved = false;
+    QStringList files;
+    for (const QUrl &url: urls) {
+        if (!url.isLocalFile()) {
+            notLocal = true;
+            break;
+        } else if (!QFileInfo(url.toLocalFile()).isReadable()) {
+            fileMoved = true;
+            break;
+        } else {
+            files.append(url.toLocalFile());
+        }
+    }
+    if (notLocal && showError) {
+        QMessageBox::information(this, windowTitle(), tr("can not send urls as files. this is a programming bug."));
+        return false;
+    }
+    if (fileMoved && showError) {
+        QMessageBox::information(this, windowTitle(), tr("can not send files. some file is moved."));
+        return false;
+    }
+    CopyPaste copyPaste;
+    copyPaste.timestamp = QDateTime::currentDateTime();
+    copyPaste.direction = CopyPaste::Outgoing;
+    copyPaste.mimeType = BinaryType;
+    copyPaste.files = files;
+    copyPaste.ignoreLimits = ignoreLimits;
+    peer->outgoing(copyPaste);
+    return true;
+}
+
+
+static inline QByteArray saveImage(const QImage &image)
+{
+    QBuffer buf;
+    buf.open(QIODevice::WriteOnly);
+    if (!image.save(&buf, "png")) {
+        return QByteArray();
+    } else {
+        return buf.data();
+    }
+}
+
+
+static inline QImage loadImage(QByteArray data)
+{
+    QBuffer buf(&data);
+    buf.open(QIODevice::ReadOnly);
+    QImage image;
+    image.load(&buf, "png");
+    return image;
+}
+
+
+bool LafdupWindow::outgoing(const QImage &image)
+{
+    if (image.isNull()) {
+        return false;
+    }
+    CopyPaste copyPaste;
+    copyPaste.timestamp = QDateTime::currentDateTime();
+    copyPaste.direction = CopyPaste::Outgoing;
+    copyPaste.mimeType = ImageType;
+    copyPaste.image = saveImage(image);
+    copyPaste.ignoreLimits = false;
+    peer->outgoing(copyPaste);
+    return true;
 }
 
 
@@ -231,50 +355,101 @@ void LafdupWindow::sendContent()
         QMessageBox::information(this, windowTitle(), tr("Can not send empty content."));
         return;
     }
+    if (outgoing(text, true)) {
+        ui->txtContent->clear();
+        ui->txtContent->setFocus();
+    }
+}
 
-    const QDateTime &now = QDateTime::currentDateTime();
-    bool ok = peer->outgoing(now, text);
-    if (!ok) {
-        QMessageBox::information(this, windowTitle(), tr("Can not send content."));
+
+void LafdupWindow::sendFiles()
+{
+    const QList<QUrl> &fileUrls = QFileDialog::getOpenFileUrls(this, tr("select files to send."));
+    if (fileUrls.isEmpty()) {
         return;
     }
-    const QModelIndex &current = copyPasteModel->addCopyPaste(CopyPasteType::Outgoing, now, text);
-    ui->lstCopyPaste->setCurrentIndex(current);
-    ui->txtContent->clear();
-    ui->txtContent->setFocus();
+    outgoing(fileUrls, true, true);
 }
 
 
 void LafdupWindow::onClipboardChanged()
 {
-    const QClipboard *clipboard = QApplication::clipboard();
-    const QString &text = clipboard->text();
-    if (text.isEmpty()) {
-        return;
+    const QClipboard * clipboard = QApplication::clipboard();
+    const QMimeData *mimeData = clipboard->mimeData();
+    if (mimeData->hasImage()) {
+        outgoing(mimeData->imageData().value<QImage>());
+    } else if (mimeData->hasUrls()) {
+        outgoing(mimeData->urls(), false, false);
+    } else if (mimeData->hasText()) {
+        outgoing(mimeData->text(), false);
     }
-    bool found = copyPasteModel->checkLastCopyPaste(CopyPasteType::Incoming, text);
-    if (found) {
-        return;
-    }
-    const QDateTime &now = QDateTime::currentDateTime();
-    bool ok = peer->outgoing(now, text);
-    if (!ok) {
-        //QMessageBox::information(this, windowTitle(), tr("Can not send content."));
-        return;
-    }
-    const QModelIndex &current = copyPasteModel->addCopyPaste(CopyPasteType::Outgoing, now, text);
-    ui->lstCopyPaste->setCurrentIndex(current);
-    ui->txtContent->clear();
-    ui->txtContent->setFocus();
 }
 
 
-void LafdupWindow::updateClipboard(const QDateTime &timestamp, const QString &text)
+struct DisableSyncClipboard
 {
-    const QModelIndex &current = copyPasteModel->addCopyPaste(CopyPasteType::Incoming, timestamp, text);
+    DisableSyncClipboard(QClipboard *clipboard, LafdupWindow *window);
+    ~DisableSyncClipboard();
+    QClipboard *clipboard;
+    LafdupWindow *window;
+};
+
+
+DisableSyncClipboard::DisableSyncClipboard(QClipboard *clipboard, LafdupWindow *window)
+    : clipboard(clipboard), window(window)
+{
+    QObject::disconnect(clipboard, SIGNAL(dataChanged()), window, nullptr);
+}
+
+
+DisableSyncClipboard::~DisableSyncClipboard()
+{
+    QPointer<LafdupWindow> windowRef(window);
+    QTimer::singleShot(100, [windowRef] {
+        if (windowRef.isNull()) {
+            return;
+        }
+        QClipboard *clipboard = QApplication::clipboard();
+        QObject::connect(clipboard, SIGNAL(dataChanged()), windowRef.data(), SLOT(onClipboardChanged()));
+    });
+}
+
+
+static bool updateClipboard(const CopyPaste &copyPaste, LafdupWindow *window)
+{
+    QClipboard *clipboard = QApplication::clipboard();
+    DisableSyncClipboard _(clipboard, window);
+    if (copyPaste.isFile()) {
+        QList<QUrl> urls;
+        for (const QString &file: copyPaste.files) {
+            urls.append(QUrl::fromLocalFile(file));
+        }
+        QMimeData *mimeData = new QMimeData();
+        mimeData->setUrls(urls);
+        clipboard->setMimeData(mimeData);
+    } else if (copyPaste.isImage()) {
+        const QImage &image = loadImage(copyPaste.image);
+        if (image.isNull()) {
+            return false;
+        }
+        clipboard->setImage(image);
+    } else if (copyPaste.isText()) {
+        clipboard->setText(copyPaste.text);
+    } else {
+        return false;
+    }
+    return true;
+}
+
+
+void LafdupWindow::updateClipboard(const CopyPaste &copyPaste)
+{
+    const QModelIndex &current = copyPasteModel->addCopyPaste(copyPaste);
     if (current.isValid()) {
         ui->lstCopyPaste->setCurrentIndex(current);
-        QApplication::clipboard()->setText(text);
+        if (copyPaste.direction == CopyPaste::Incoming) {
+            ::updateClipboard(copyPaste, this);
+        }
     }
 }
 
@@ -301,19 +476,10 @@ void LafdupWindow::copyToRemote()
     if (!current.isValid()) {
         return;
     }
-    const CopyPaste &copyPaste = copyPasteModel->copyPasteAt(current);
-    if (copyPaste.text.isEmpty()) {
-        return;
-    }
-
-    const QDateTime &now = QDateTime::currentDateTime();
-    bool ok = peer->outgoing(now, copyPaste.text);
-    if (!ok) {
-        //QMessageBox::information(this, windowTitle(), tr("Can not send content."));
-        return;
-    }
-    const QModelIndex &t = copyPasteModel->addCopyPaste(CopyPasteType::Outgoing, now, copyPaste.text);
-    ui->lstCopyPaste->setCurrentIndex(t);
+    CopyPaste copyPaste = copyPasteModel->copyPasteAt(current);
+    copyPaste.timestamp = QDateTime::currentDateTime();
+    copyPaste.direction = CopyPaste::Outgoing;
+    peer->outgoing(copyPaste);
 }
 
 
@@ -324,12 +490,7 @@ void LafdupWindow::setToClipboard()
         return;
     }
     const CopyPaste &copyPaste = copyPasteModel->copyPasteAt(current);
-    if (!copyPaste.text.isEmpty()) {
-        const QClipboard *clipboard = QApplication::clipboard();
-        disconnect(clipboard, SIGNAL(dataChanged()), this, SLOT(onClipboardChanged()));
-        QApplication::clipboard()->setText(copyPaste.text);
-        connect(clipboard, SIGNAL(dataChanged()), SLOT(onClipboardChanged()));
-    }
+    ::updateClipboard(copyPaste, this);
 }
 
 
@@ -352,16 +513,16 @@ void LafdupWindow::clearAll()
 void LafdupWindow::onPeerStateChanged(bool ok)
 {
     if (!ok) {
-        qDebug() << "peer is down.";
+        qDebug("peer is down.");
     }
 }
 
 
-void LafdupWindow::managePeers()
+void LafdupWindow::configure()
 {
-    ManagePeersDialog d(this);
+    ConfigureDialog d(this);
     if (d.exec() == QDialog::Accepted) {
-        loadKnownPeers();
+        loadConfiguration(d.isPasswordChanged());
     }
 }
 
@@ -398,36 +559,74 @@ void LafdupWindow::updateMyIP()
 void LafdupWindow::loadPassword()
 {
     QSettings settings;
-    const QString &password = settings.value("password").toString();
+    const QByteArray &password = settings.value("password").toByteArray();
     if (password.isEmpty()) {
         setPassword();
     } else {
-        QSharedPointer<Cipher> cipher(new Cipher(Cipher::AES256, Cipher::CFB, Cipher::Encrypt));
-        const QByteArray &salt = "31415926535";
-        cipher->setPassword(password.toUtf8(), salt, MessageDigest::Sha256, 10000);
-        if (cipher->isValid()) {
-            peer->setCipher(cipher);
-        } else {
-            QMessageBox::information(this, windowTitle(), tr("There is some error on cipher, data is not protected."));
-        }
+        peer->setPassword(password);
     }
 }
 
 
-void LafdupWindow::loadKnownPeers()
+void LafdupWindow::loadConfiguration(bool withPassword)
 {
+    bool ok;
     QSettings settings;
     const QStringList &knownPeers = settings.value("known_peers").toStringList();
     if (!knownPeers.isEmpty()) {
-        QList<HostAddress> addresses;
+        QSet<QPair<HostAddress, quint16>> addresses;
         for (int i = 0; i < knownPeers.size(); ++i) {
             HostAddress addr(knownPeers.at(i));
             if (!addr.isNull()) {
-                addresses.append(addr);
+                addresses.insert(qMakePair(addr, peer->getDefaultPort()));
             }
         }
-        peer->setKnownPeers(addresses);
+        peer->setExtraKnownPeers(addresses);
     }
+    if (withPassword) {
+        const QByteArray &password = settings.value("password").toByteArray();
+        if (!password.isEmpty()) {
+            peer->setPassword(password);
+        }
+    }
+
+    const QString &cacheDirPath = settings.value("cache_dir").toString();
+    QFileInfo cacheDir(cacheDirPath);
+    if (cacheDir.isWritable() && cacheDir.isDir()) {
+        peer->setCacheDir(cacheDirPath);
+        bool deleteFiles = settings.value("delete_files", true).toBool();
+        if (deleteFiles) {
+            int deleteFilesTime = settings.value("delete_files_time", 30).toInt(&ok);
+            if (!ok) {
+                deleteFilesTime = 30;
+            }
+            if (deleteFilesTime < 1) {
+                deleteFilesTime = 1;
+            }
+            peer->setDeleteFilesTime(deleteFilesTime);
+        } else {
+            peer->setDeleteFilesTime(0);
+        }
+    }
+
+    bool sendFiles = settings.value("send_files", true).toBool();
+    if (sendFiles) {
+        bool onlySendSmallFiles = settings.value("only_send_small_files", true).toBool();
+        if (!onlySendSmallFiles) {
+            peer->setSendFilesSize(INT_MAX); // unlimited
+        } else {
+            float sendFilesSize = settings.value("send_files_size", 100.0).toFloat(&ok);
+            if (!ok) {
+                sendFilesSize = 100.0;
+            }
+            peer->setSendFilesSize(sendFilesSize);
+        }
+    } else {
+        peer->setSendFilesSize(0.0);
+    }
+
+    bool ignorePassword = settings.value("ignore_password", false).toBool();
+    peer->setIgnorePassword(ignorePassword);
 }
 
 
@@ -449,7 +648,6 @@ void LafdupWindow::showAndGetFocus()
     raise();
     moveToCenter(this);
 }
-
 
 
 PasswordDialog::PasswordDialog(QWidget *parent)
@@ -474,10 +672,10 @@ void PasswordDialog::accept()
         return;
     }
     QSettings settings;
-    settings.setValue("password", password);
+    QByteArray salt("3.1415926535897932384626433");
+    settings.setValue("password", qtng::PBKDF2_HMAC(256, password.toUtf8(), salt));
     QDialog::accept();
 }
-
 
 
 void PeerModel::setPeers(const QStringList &peers)
@@ -534,36 +732,141 @@ QVariant PeerModel::data(const QModelIndex &index, int role) const
 }
 
 
-ManagePeersDialog::ManagePeersDialog(QWidget *parent)
-    :QDialog(parent), ui(new Ui::ManagePeersDialog), peerModel(new PeerModel)
+ConfigureDialog::ConfigureDialog(QWidget *parent)
+    :QDialog(parent), ui(new Ui::ConfigureDialog), peerModel(new PeerModel)
 {
     ui->setupUi(this);
+    moveToCenter(this);
+    loadSettings();
+
     connect(ui->btnAdd, SIGNAL(clicked(bool)), SLOT(addPeer()));
     connect(ui->btnRemove, SIGNAL(clicked(bool)), SLOT(removeSelectedPeer()));
-    QSettings settings;
-    const QStringList &knownPeers = settings.value("known_peers").toStringList();
-    peerModel->setPeers(knownPeers);
-    ui->lstIPs->setModel(peerModel);
+    connect(ui->txtCacheDirectory, &QLineEdit::textChanged, this, &ConfigureDialog::onCacheDirectoryChanged);
+    connect(ui->btnSelectCacheDirectory, &QPushButton::clicked, this, &ConfigureDialog::selectCacheDirectory);
+    connect(ui->chkDeleteFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onDeleteFilesChanged);
+    connect(ui->chkSendFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onSendFilesChanged);
+    connect(ui->chkOnlySendSmallFile, &QCheckBox::stateChanged, this, &ConfigureDialog::onOnlySendSmallFileChanged);
 }
 
 
-ManagePeersDialog::~ManagePeersDialog()
+ConfigureDialog::~ConfigureDialog()
 {
-    delete ui;
     delete peerModel;
+    delete ui;
 }
 
 
-void ManagePeersDialog::accept()
+void ConfigureDialog::accept()
 {
+    const QString &password = ui->txtPassword->text();
+
     const QStringList &peers = peerModel->getPeers();
     QSettings settings;
     settings.setValue("known_peers", peers);
+    if (!password.isEmpty()) {
+        settings.setValue("password", password);
+    }
+    settings.setValue("cache_dir", ui->txtCacheDirectory->text());
+    settings.setValue("delete_files", ui->chkDeleteFiles->isChecked());
+    settings.setValue("delete_files_time", ui->spinDeleteFilesTime->value());
+    settings.setValue("send_files", ui->chkSendFiles->isChecked());
+    settings.setValue("only_send_small_files", ui->chkOnlySendSmallFile->isChecked());
+    settings.setValue("send_files_size", ui->spinSendFileSize->value());
+    settings.setValue("ignore_password", ui->chkIgnorePassword->isChecked());
     QDialog::accept();
 }
 
 
-void ManagePeersDialog::addPeer()
+void ConfigureDialog::loadSettings()
+{
+    QSettings settings;
+    const QStringList &knownPeers = settings.value("known_peers").toStringList();
+    const QString &cacheDirPath = settings.value("cache_dir").toString();
+    bool deleteFiles = settings.value("delete_files", true).toBool();
+    bool ok;
+    int deleteFilesTime = settings.value("delete_files_time", 30).toInt(&ok);
+    if (!ok) {
+        deleteFilesTime = 30;
+    }
+    if (deleteFilesTime < 1) {
+        deleteFilesTime = 1;
+    }
+    bool sendFiles = settings.value("send_files", true).toBool();
+    bool onlySendSmallFiles = settings.value("only_send_small_files", true).toBool();
+    int sendFilesSize = settings.value("send_files_size", 100.0).toInt(&ok);
+    if (!ok) {
+        sendFilesSize = 100.0;
+    }
+    bool ignorePassword = settings.value("ignore_password", false).toBool();
+    peerModel->setPeers(knownPeers);
+    ui->lstIPs->setModel(peerModel);
+    ui->txtCacheDirectory->setText(cacheDirPath);
+    ui->chkDeleteFiles->setChecked(deleteFiles);
+    ui->spinDeleteFilesTime->setValue(deleteFilesTime);
+    ui->chkSendFiles->setChecked(sendFiles);
+    ui->chkOnlySendSmallFile->setChecked(onlySendSmallFiles);
+    ui->spinSendFileSize->setValue(sendFilesSize);
+    if (!cacheDirPath.isEmpty()) {
+        ui->chkDeleteFiles->setEnabled(true);
+        ui->spinDeleteFilesTime->setEnabled(true);
+    }
+    if (!sendFiles) {
+        ui->chkOnlySendSmallFile->setEnabled(false);
+        ui->spinSendFileSize->setEnabled(false);
+    }
+    ui->chkIgnorePassword->setChecked(ignorePassword);
+}
+
+bool ConfigureDialog::isPasswordChanged()
+{
+    return !ui->txtPassword->text().isEmpty();
+}
+
+
+void ConfigureDialog::onCacheDirectoryChanged(const QString &text)
+{
+    QFileInfo fileInfo(text);
+    bool ok = fileInfo.isDir() && fileInfo.isWritable();
+
+    ui->chkDeleteFiles->setEnabled(ok);
+    ui->spinDeleteFilesTime->setEnabled(ok && ui->chkDeleteFiles->isChecked());
+}
+
+
+void ConfigureDialog::selectCacheDirectory()
+{
+    const QString &path = QFileDialog::getExistingDirectory(this, tr("Select Cache Directory to Receive Files."));
+    if (path.isEmpty()) {
+        return;
+    }
+    ui->txtCacheDirectory->setText(path);
+}
+
+
+void ConfigureDialog::onDeleteFilesChanged(bool checked)
+{
+    ui->spinDeleteFilesTime->setEnabled(checked);
+}
+
+
+void ConfigureDialog::onSendFilesChanged(bool checked)
+{
+    ui->chkOnlySendSmallFile->setEnabled(checked);
+    if (!checked) {
+        ui->spinSendFileSize->setEnabled(false);
+    } else {
+        ui->spinSendFileSize->setEnabled(ui->chkOnlySendSmallFile->isChecked());
+    }
+}
+
+
+void ConfigureDialog::onOnlySendSmallFileChanged(bool checked)
+{
+    ui->spinSendFileSize->setEnabled(checked);
+}
+
+
+void ConfigureDialog::addPeer()
 {
     const QString &ip = ui->txtIP->text();
     HostAddress addr(ip);
@@ -580,7 +883,7 @@ void ManagePeersDialog::addPeer()
 }
 
 
-void ManagePeersDialog::removeSelectedPeer()
+void ConfigureDialog::removeSelectedPeer()
 {
     const QModelIndex &current = ui->lstIPs->currentIndex();
     if (current.isValid()) {

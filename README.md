@@ -33,7 +33,7 @@ Using cmake to build this project.
 
     $ git clone https://github.com/hgoldfish/lafdup.git
     $ cd lafdup
-    $ git clone https://github.com/hgoldfish/qtnetworkng.git
+    $ git clone https://github.com/hgoldfish/lafrpc.git
     $ mkdir build
     $ cd build
     $ cmake ..

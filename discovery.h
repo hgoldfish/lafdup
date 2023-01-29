@@ -3,9 +3,8 @@
 
 #include "lafrpc.h"
 
-
 class LafdupDiscovery;
-class LafdupKcpSocket: public qtng::KcpSocket
+class LafdupKcpSocket : public qtng::KcpSocket
 {
 public:
     LafdupKcpSocket(LafdupDiscovery *parent);
@@ -13,7 +12,6 @@ public:
 private:
     LafdupDiscovery *parent;
 };
-
 
 class LafdupPeer;
 class LafdupDiscovery
@@ -30,7 +28,6 @@ public:
     quint16 getPort();
     QByteArray getUuid();
     static quint16 getDefaultPort();
-    QSharedPointer<qtng::KcpSocket> connect(const qtng::HostAddress &addr, quint16 port);
 private:
     void serve();
     void discovery();

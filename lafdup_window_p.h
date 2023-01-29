@@ -9,10 +9,9 @@
 namespace Ui {
 class PasswordDialog;
 class ConfigureDialog;
-}
+}  // namespace Ui
 
-
-class CopyPasteModel: public QAbstractListModel
+class CopyPasteModel : public QAbstractListModel
 {
 public:
     CopyPasteModel();
@@ -20,7 +19,7 @@ public:
     int rowCount(const QModelIndex &parent) const override;
     QVariant data(const QModelIndex &index, int role) const override;
 public:
-//    bool checkLastCopyPaste(CopyPaste::Direction direction, const QString &text) const;
+    //    bool checkLastCopyPaste(CopyPaste::Direction direction, const QString &text) const;
     QModelIndex addCopyPaste(const CopyPaste &copyPaste);
     CopyPaste copyPasteAt(const QModelIndex &index) const;
     bool removeCopyPaste(const QModelIndex &index);
@@ -29,8 +28,7 @@ private:
     QList<CopyPaste> copyPasteList;
 };
 
-
-class PeerModel: public QAbstractListModel
+class PeerModel : public QAbstractListModel
 {
 public:
     void setPeers(const QStringList &peers);
@@ -44,8 +42,7 @@ private:
     QStringList peers;
 };
 
-
-class PasswordDialog: public QDialog
+class PasswordDialog : public QDialog
 {
 public:
     PasswordDialog(QWidget *parent);
@@ -56,8 +53,7 @@ private:
     Ui::PasswordDialog *ui;
 };
 
-
-class ConfigureDialog: public QDialog
+class ConfigureDialog : public QDialog
 {
     Q_OBJECT
 public:
@@ -80,6 +76,5 @@ private:
     Ui::ConfigureDialog *ui;
     PeerModel *peerModel;
 };
-
 
 #endif

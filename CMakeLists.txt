@@ -44,8 +44,6 @@ set(LAFDUP_SRC
 add_definitions(-DQT_NO_CAST_TO_ASCII)
 if (MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
-else()
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -z noexecstack")
 endif()
 
 add_executable(lafdup WIN32 ${LAFDUP_SRC})

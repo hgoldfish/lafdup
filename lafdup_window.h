@@ -5,14 +5,12 @@
 #include <QtWidgets/qsystemtrayicon.h>
 #include "peer.h"
 
-
 namespace Ui {
 class LafdupWindow;
 }
 
-
 class CopyPasteModel;
-class LafdupWindow: public QWidget
+class LafdupWindow : public QWidget
 {
     Q_OBJECT
 public:

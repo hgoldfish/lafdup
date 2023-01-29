@@ -6,8 +6,11 @@
 
 int main(int argc, char **argv)
 {
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
+    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+
     QApplication app(argc, argv);
-    app.setOrganizationDomain("com.gigacores.lafdup");
+    app.setOrganizationDomain("lafdup.gigacores.com");
     app.setOrganizationName("GigaCores");
     app.setApplicationDisplayName("Sync Clipboard");
     app.setApplicationName("SyncClipboard");
@@ -27,6 +30,7 @@ int main(int argc, char **argv)
     app.setFont(f);
     app.setStyle(QStyleFactory::create("fusion"));
 #endif
+
     LafdupWindow w;
     if (!parser.isSet(minimizedOption)) {
         w.showAndGetFocus();

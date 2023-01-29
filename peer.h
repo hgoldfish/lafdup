@@ -8,8 +8,7 @@
 class LafdupDiscovery;
 class LafdupRemoteStub;
 
-
-class LafdupPeer: public QObject
+class LafdupPeer : public QObject
 {
     Q_OBJECT
 public:
@@ -37,7 +36,10 @@ protected:
     void tryToConnectPeer(QString itsPeerName, qtng::HostAddress remoteHost, quint16 port);
     void tryToConnectPeer(QSharedPointer<qtng::KcpSocket> request);
 private:
-    void handleKcpRequest(QSharedPointer<qtng::KcpSocket> request, qtng::DataChannelPole pole, const QString &itsPeerName);
+    void handleKcpRequestSync(QSharedPointer<qtng::KcpSocket> request, qtng::DataChannelPole pole,
+                              const QString &itsPeerName);
+    QSharedPointer<lafrpc::Peer> handleRequestSync(QSharedPointer<qtng::SocketLike> request, qtng::DataChannelPole pole,
+                                                   const QString &itsPeerName, const QString &itsAddress);
     void _outgoing(CopyPaste copyPaste);
     bool findItem(const QDateTime &timestamp);
     void writeInformation(const QDir destDir);

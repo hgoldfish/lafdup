@@ -3,7 +3,7 @@
 
 #include "peer.h"
 
-class LafdupRemoteStub: public QObject
+class LafdupRemoteStub : public QObject
 {
     Q_OBJECT
 public:
@@ -17,6 +17,5 @@ public slots:
 private:
     LafdupPeer *parent;
 };
-
 
 #endif

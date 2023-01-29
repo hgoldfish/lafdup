@@ -10,14 +10,10 @@ const QString TextType = "text/plain";
 const QString BinaryType = "application/octet-stream";
 const QString ImageType = "image/png";
 
-
 struct CopyPaste
 {
 public:
-    enum Direction
-    {
-        Incoming, Outgoing
-    };
+    enum Direction { Incoming, Outgoing };
 public:
     CopyPaste(const Direction &direction, const QDateTime &timestamp, const QString &text);
     CopyPaste();
@@ -40,6 +36,5 @@ public:
 };
 Q_DECLARE_METATYPE(CopyPaste);
 Q_DECLARE_METATYPE(QSharedPointer<CopyPaste>);
-
 
 #endif

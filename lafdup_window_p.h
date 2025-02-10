@@ -13,6 +13,7 @@ class ConfigureDialog;
 
 class CopyPasteModel : public QAbstractListModel
 {
+    Q_OBJECT
 public:
     CopyPasteModel();
 public:
@@ -44,6 +45,7 @@ private:
 
 class PasswordDialog : public QDialog
 {
+    Q_OBJECT
 public:
     PasswordDialog(QWidget *parent);
     virtual ~PasswordDialog() override;
@@ -70,11 +72,13 @@ private slots:
     void onOnlySendSmallFileChanged(bool checked);
     void removeSelectedPeer();
     void addPeer();
+    void onChangelanguage();
 private:
     void loadSettings();
 private:
     Ui::ConfigureDialog *ui;
     PeerModel *peerModel;
+
 };
 
 #endif

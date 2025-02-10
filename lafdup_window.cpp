@@ -1,18 +1,21 @@
-#include <QtCore/qabstractitemmodel.h>
-#include <QtCore/qsettings.h>
-#include <QtCore/qtimer.h>
-#include <QtCore/qmimedata.h>
-#include <QtCore/qbuffer.h>
-#include <QtGui/qevent.h>
-#include <QtGui/qclipboard.h>
-#include <QtWidgets/qmessagebox.h>
-#include <QtWidgets/qmenu.h>
-#include <QtWidgets/qdesktopwidget.h>
-#include <QtWidgets/qfiledialog.h>
 #include "lafdup_window_p.h"
+#include "lafdupapplication.h"
+#include "ui_configure.h"
 #include "ui_main.h"
 #include "ui_password.h"
-#include "ui_configure.h"
+#include <QtCore/qabstractitemmodel.h>
+#include <QtCore/qbuffer.h>
+#include <QtCore/qmimedata.h>
+#include <QtCore/qprocess.h>
+#include <QtCore/qsettings.h>
+#include <QtCore/qtextcodec.h>
+#include <QtCore/qtimer.h>
+#include <QtGui/qclipboard.h>
+#include <QtGui/qevent.h>
+#include <QtWidgets/qdesktopwidget.h>
+#include <QtWidgets/qfiledialog.h>
+#include <QtWidgets/qmenu.h>
+#include <QtWidgets/qmessagebox.h>
 
 using namespace qtng;
 
@@ -126,8 +129,10 @@ public:
         , mainWindow(mainWindow)
     {
     }
+
 public:
     bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     LafdupWindow *mainWindow;
 };
@@ -241,6 +246,14 @@ void LafdupWindow::dragEnterEvent(QDragEnterEvent *event)
     if (mimeData->hasUrls()) {
         event->acceptProposedAction();
     }
+}
+
+bool LafdupWindow::event(QEvent *e)
+{
+    if (e->type() == QEvent::LanguageChange) {
+        ui->retranslateUi(this);
+    }
+    return QWidget::event(e);
 }
 
 bool LafdupWindow::outgoing(const QString &text, bool ignoreLimits)
@@ -576,7 +589,7 @@ void LafdupWindow::loadConfiguration(bool withPassword)
     if (sendFiles) {
         bool onlySendSmallFiles = settings.value("only_send_small_files", true).toBool();
         if (!onlySendSmallFiles) {
-            peer->setSendFilesSize(INT_MAX);  // unlimited
+            peer->setSendFilesSize(float(INT_MAX));  // unlimited
         } else {
             float sendFilesSize = settings.value("send_files_size", 100.0).toFloat(&ok);
             if (!ok) {
@@ -592,7 +605,7 @@ void LafdupWindow::loadConfiguration(bool withPassword)
     peer->setIgnorePassword(ignorePassword);
 }
 
-void moveToCenter(QWidget * const widget)
+void moveToCenter(QWidget *const widget)
 {
     QRect r = widget->geometry();
     r.moveCenter(QApplication::desktop()->screenGeometry(widget).center());
@@ -701,6 +714,7 @@ ConfigureDialog::ConfigureDialog(QWidget *parent)
     connect(ui->chkDeleteFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onDeleteFilesChanged);
     connect(ui->chkSendFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onSendFilesChanged);
     connect(ui->chkOnlySendSmallFile, &QCheckBox::stateChanged, this, &ConfigureDialog::onOnlySendSmallFileChanged);
+    connect(ui->btnChangeLanguage, &QPushButton::clicked, this, &ConfigureDialog::onChangelanguage);
 }
 
 ConfigureDialog::~ConfigureDialog()
@@ -825,6 +839,34 @@ void ConfigureDialog::addPeer()
     const QModelIndex &current = peerModel->addPeer(addr.toString());
     if (current.isValid()) {
         ui->lstIPs->setCurrentIndex(current);
+    }
+}
+
+void ConfigureDialog::onChangelanguage()
+{
+    int ret = ui->cbBLanguage->currentIndex();
+    QString language = "";
+    switch (ret) {
+    case 0:
+        language = "English";
+        break;
+    case 1:
+        language = "Chinese_CN";
+        break;
+    default:
+        break;
+    }
+    QMessageBox::StandardButton result = QMessageBox::question(
+            this, tr("changeLanguage"), tr("Whether or not to change the language used by the program"));
+    if (result == QMessageBox::Yes) {
+        QSettings setting("/lafdup.ini", QSettings::IniFormat);
+        setting.setIniCodec(QTextCodec::codecForName("UTF-8"));
+        setting.beginGroup("Language");
+        setting.setValue("languageValue", language);
+        setting.endGroup();
+        setting.sync();
+        lpp->translationLanguage();
+        ui->retranslateUi(this);
     }
 }
 

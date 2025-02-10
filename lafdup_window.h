@@ -4,7 +4,7 @@
 #include <QtWidgets/qwidget.h>
 #include <QtWidgets/qsystemtrayicon.h>
 #include "peer.h"
-
+#include <QEvent>
 namespace Ui {
 class LafdupWindow;
 }
@@ -16,12 +16,14 @@ class LafdupWindow : public QWidget
 public:
     LafdupWindow();
     virtual ~LafdupWindow() override;
+
 protected:
     virtual void showEvent(QShowEvent *event) override;
     virtual void changeEvent(QEvent *event) override;
     virtual void closeEvent(QCloseEvent *event) override;
     virtual void dropEvent(QDropEvent *event) override;
     virtual void dragEnterEvent(QDragEnterEvent *event) override;
+    bool event(QEvent *e);
 public slots:
     void sendContent();
     void showAndGetFocus();

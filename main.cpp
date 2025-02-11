@@ -1,7 +1,10 @@
 #include <QtCore/qcommandlineparser.h>
 #include <QtWidgets/qapplication.h>
 #include <QtWidgets/qstylefactory.h>
+#include <QtCore/qsystemsemaphore.h>
+#include <QtCore/qsharedmemory.h>
 #include "lafdup_window.h"
+#include "lafdupapplication.h"
 #include "qtnetworkng.h"
 
 int main(int argc, char **argv)
@@ -9,7 +12,7 @@ int main(int argc, char **argv)
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
     QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
 
-    QApplication app(argc, argv);
+    LafdupApplication app(argc, argv);
     app.setOrganizationDomain("lafdup.gigacores.com");
     app.setOrganizationName("GigaCores");
     app.setApplicationDisplayName("Sync Clipboard");
@@ -30,11 +33,22 @@ int main(int argc, char **argv)
     app.setFont(f);
     app.setStyle(QStyleFactory::create("fusion"));
 #endif
+    app.translationLanguage();
+
+    QSystemSemaphore sema("systemSemaphore", 1, QSystemSemaphore::Open);
+    sema.acquire();
+    QSharedMemory mem("memory");
+    if (!mem.create(1)) {
+        QMessageBox::information(nullptr, QObject::tr("tips"),
+                                 QObject::tr("The program is running, please exit first if necessary"));
+        sema.release();
+        return 0;
+    }
+    sema.release();
 
     LafdupWindow w;
     if (!parser.isSet(minimizedOption)) {
         w.showAndGetFocus();
     }
-
     return qtng::startQtLoop();
 }

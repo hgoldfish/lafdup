@@ -8,6 +8,8 @@ project(lafdup)
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../lafrpc/cpp/lafrpc.h")
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../lafrpc/cpp/ lafrpc)
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../lafrpc/cpp/lafrpc.h")
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../lafrpc/cpp/ lafrpc)
 else()
     add_subdirectory(lafrpc/cpp lafrpc)
 endif()
@@ -25,6 +27,8 @@ set(LAFDUP_SRC
     lafdup_window.cpp
     lafdup_window.h
     lafdup_window_p.h
+    lafdupapplication.h
+    lafdupapplication.cpp
     lafdup.qrc
 
     peer.h
@@ -49,3 +53,22 @@ endif()
 add_executable(lafdup WIN32 ${LAFDUP_SRC})
 target_link_libraries(lafdup Qt5::Widgets Qt5::Core lafrpc)
 
+#查找Qt翻译工具
+find_package(Qt5 REQUIRED COMPONENTS LinguistTools REQUIRED)
+
+# 初始化要使用的列表
+set(TS_FILES
+    translations/lafdup_zh_CN.ts
+)
+set(QM_FILES)
+
+# 设置翻译文件的生成路径，如果不指定就会生成在CMakeFiles的目录里
+set_source_files_properties(${TS_FILES}
+    PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/translations
+)
+# 创建翻译的最关键一步
+qt5_create_translation(QM_FILES ${TS_FILES} ${LAFDUP_SRC} OPTIONS -no-obsolete -no-ui-lines)
+
+# 添加更新翻译的目标
+add_custom_target(lupdate_task DEPENDS ${TS_FILES})
+add_custom_target(lrelease_task DEPENDS ${QM_FILES})

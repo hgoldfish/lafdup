@@ -1,18 +1,19 @@
-#include <QtCore/qabstractitemmodel.h>
-#include <QtCore/qsettings.h>
-#include <QtCore/qtimer.h>
-#include <QtCore/qmimedata.h>
-#include <QtCore/qbuffer.h>
-#include <QtGui/qevent.h>
-#include <QtGui/qclipboard.h>
-#include <QtWidgets/qmessagebox.h>
-#include <QtWidgets/qmenu.h>
-#include <QtWidgets/qdesktopwidget.h>
-#include <QtWidgets/qfiledialog.h>
 #include "lafdup_window_p.h"
+#include "lafdupapplication.h"
+#include "ui_configure.h"
 #include "ui_main.h"
 #include "ui_password.h"
-#include "ui_configure.h"
+#include <QtCore/qabstractitemmodel.h>
+#include <QtCore/qbuffer.h>
+#include <QtCore/qmimedata.h>
+#include <QtCore/qsettings.h>
+#include <QtCore/qtimer.h>
+#include <QtGui/qclipboard.h>
+#include <QtGui/qevent.h>
+#include <QtGui/qpainter.h>
+#include <QtWidgets/qdesktopwidget.h>
+#include <QtWidgets/qfiledialog.h>
+#include <QtWidgets/qmenu.h>
 
 using namespace qtng;
 
@@ -38,9 +39,8 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
         if (copyPaste.isText()) {
             const QString &cleanedText =
                     copyPaste.text.trimmed().left(128).replace("\n", "").replace("\b*", " ").left(32);
-            const QString &text = QStringLiteral("%2\n%1")
-                                          .arg(copyPaste.timestamp.time().toString(Qt::ISODate))
-                                          .arg(cleanedText.isEmpty() ? tr("<Spaces>") : cleanedText);
+            const QString &text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate),
+                                                               cleanedText.isEmpty() ? tr("<Spaces>") : cleanedText);
             return text;
         } else if (copyPaste.isFile()) {
             QStringList fileNames;
@@ -59,6 +59,22 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
         } else {
             return QIcon(":/images/ic_file_upload_black_48dp.png").pixmap(QSize(32, 32));
             ;
+        }
+    } else if (role == Qt::ToolTipRole) {
+        if (copyPaste.isText()) {
+            const QString &text =
+                    QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate),
+                                                 copyPaste.text.isEmpty() ? tr("<Spaces>") : copyPaste.text);
+            return text;
+        } else if (copyPaste.isFile()) {
+            QStringList fileNames;
+            for (const QString &path : copyPaste.files) {
+                QFileInfo fileInfo(path);
+                fileNames.append(fileInfo.absoluteFilePath());
+            }
+            return fileNames.join("\n");
+        } else if (copyPaste.isImage()) {
+            return "Image";
         }
     }
 
@@ -79,7 +95,8 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
 
 QModelIndex CopyPasteModel::addCopyPaste(const CopyPaste &copyPaste)
 {
-    for (const CopyPaste &old : copyPasteList) {
+    const auto &list = copyPasteList;
+    for (const CopyPaste &old : list) {
         if (old.direction == copyPaste.direction && old.timestamp == copyPaste.timestamp) {
             return QModelIndex();
         }
@@ -182,10 +199,12 @@ LafdupWindow::LafdupWindow()
 
     connect(peer.data(), &LafdupPeer::stateChanged, this, &LafdupWindow::onPeerStateChanged);
     connect(peer.data(), &LafdupPeer::incoming, this, &LafdupWindow::updateClipboard);
+    connect(peer.data(), &LafdupPeer::sendFileFailed, this, &LafdupWindow::sendFileFailedTips);
 
     loadConfiguration(true);
     started = peer->start();
     setAcceptDrops(true);
+    ui->txtContent->setAcceptDrops(false);
 }
 
 LafdupWindow::~LafdupWindow()
@@ -241,6 +260,14 @@ void LafdupWindow::dragEnterEvent(QDragEnterEvent *event)
     if (mimeData->hasUrls()) {
         event->acceptProposedAction();
     }
+}
+
+bool LafdupWindow::event(QEvent *e)
+{
+    if (e->type() == QEvent::LanguageChange) {
+        ui->retranslateUi(this);
+    }
+    return QWidget::event(e);
 }
 
 bool LafdupWindow::outgoing(const QString &text, bool ignoreLimits)
@@ -351,6 +378,13 @@ void LafdupWindow::sendFiles()
     outgoing(fileUrls, true, true);
 }
 
+void LafdupWindow::sendFileFailedTips(QString name, QString address)
+{
+    QString tipStr =
+            tr("send  %1 to %2 failed \n The peer party may not set the path for receiving files").arg(name, address);
+    MessageTips::showMessageTips(tipStr, this);
+}
+
 void LafdupWindow::onClipboardChanged()
 {
     const QClipboard *clipboard = QApplication::clipboard();
@@ -382,7 +416,7 @@ DisableSyncClipboard::DisableSyncClipboard(QClipboard *clipboard, LafdupWindow *
 DisableSyncClipboard::~DisableSyncClipboard()
 {
     QPointer<LafdupWindow> windowRef(window);
-    QTimer::singleShot(100, [windowRef] {
+    QTimer::singleShot(100, windowRef, [windowRef] {
         if (windowRef.isNull()) {
             return;
         }
@@ -513,7 +547,8 @@ void LafdupWindow::updateMyIP()
 {
     QString text = tr("My IP Addresses:");
     text.append("\n");
-    for (const QString &ip : peer->getAllBoundAddresses()) {
+    const auto &list = peer->getAllBoundAddresses();
+    for (const QString &ip : list) {
         text.append(ip);
         text.append("\n");
     }
@@ -576,7 +611,7 @@ void LafdupWindow::loadConfiguration(bool withPassword)
     if (sendFiles) {
         bool onlySendSmallFiles = settings.value("only_send_small_files", true).toBool();
         if (!onlySendSmallFiles) {
-            peer->setSendFilesSize(INT_MAX);  // unlimited
+            peer->setSendFilesSize(float(INT_MAX));  // unlimited
         } else {
             float sendFilesSize = settings.value("send_files_size", 100.0).toFloat(&ok);
             if (!ok) {
@@ -701,6 +736,7 @@ ConfigureDialog::ConfigureDialog(QWidget *parent)
     connect(ui->chkDeleteFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onDeleteFilesChanged);
     connect(ui->chkSendFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onSendFilesChanged);
     connect(ui->chkOnlySendSmallFile, &QCheckBox::stateChanged, this, &ConfigureDialog::onOnlySendSmallFileChanged);
+    connect(ui->btnChangeLanguage, &QPushButton::clicked, this, &ConfigureDialog::onChangelanguage);
 }
 
 ConfigureDialog::~ConfigureDialog()
@@ -767,6 +803,11 @@ void ConfigureDialog::loadSettings()
         ui->spinSendFileSize->setEnabled(false);
     }
     ui->chkIgnorePassword->setChecked(ignorePassword);
+    if (lpp->languageStr == "Chinese_CN") {
+        ui->cbBLanguage->setCurrentIndex(1);
+    } else {
+        ui->cbBLanguage->setCurrentIndex(0);
+    }
 }
 
 bool ConfigureDialog::isPasswordChanged()
@@ -828,10 +869,122 @@ void ConfigureDialog::addPeer()
     }
 }
 
+void ConfigureDialog::onChangelanguage()
+{
+    int ret = ui->cbBLanguage->currentIndex();
+    QString language;
+    switch (ret) {
+    case 0:
+        language = "English";
+        break;
+    case 1:
+        language = "Chinese_CN";
+        break;
+    default:
+        break;
+    }
+    QMessageBox::StandardButton result = QMessageBox::question(
+            this, tr("changeLanguage"), tr("Whether or not to change the language used by the program"));
+    if (result == QMessageBox::Yes) {
+        QSettings setting;
+        setting.setValue("language", language);
+        lpp->translationLanguage();
+        ui->retranslateUi(this);
+    }
+}
+
 void ConfigureDialog::removeSelectedPeer()
 {
     const QModelIndex &current = ui->lstIPs->currentIndex();
     if (current.isValid()) {
         peerModel->removePeer(current);
     }
+}
+
+MessageTips::MessageTips(const QString &str, QWidget *partent)
+    : QWidget(partent)
+    , showStr(str)
+{
+    setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
+    this->setAttribute(Qt::WA_TranslucentBackground);
+    this->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    this->setAttribute(Qt::WA_DeleteOnClose);
+    this->setFixedHeight(50);
+    QFontMetrics fontMetrics(lpp->font());
+    int textWidth = fontMetrics.horizontalAdvance(showStr);
+    if (textWidth > 200) {
+        this->setFixedWidth(textWidth + 50);
+    } else {
+        this->setFixedWidth(200);
+    }
+}
+
+MessageTips::~MessageTips()
+{
+    if (mtimer != nullptr) {
+        delete mtimer;
+        mtimer = nullptr;
+    }
+}
+
+void MessageTips::prepare()
+{
+    this->setWindowOpacity(opacity);
+    connect(this, SIGNAL(finished()), this, SLOT(onFinished()));
+    mtimer = new QTimer(this);  // 隐藏的定时器
+    mtimer->setTimerType(Qt::PreciseTimer);
+    connect(mtimer, &QTimer::timeout, this, &MessageTips::opacityTimer);
+    this->move(this->parentWidget()->x() + (this->parentWidget()->width()) / 2 - this->width() / 2,
+               this->parentWidget()->y() + (this->parentWidget()->height()) / 2 - this->height() / 2);
+    QTimer::singleShot(showTime, this, [this] { mtimer->start(closeTime); });  // 执行延时自动关闭
+}
+
+void MessageTips::setCloseTimeSpeed(int time, double speed)
+{
+    if (speed > 0 && speed <= 1) {
+        closeSpeed = speed;
+    }
+    closeTime = time;
+}
+
+void MessageTips::paintEvent(QPaintEvent *event)
+{
+    QPainter painter(this);
+    painter.setBrush(QBrush(bgColor));  // 窗体的背景色
+    painter.setPen(QPen(frameColor, frameSize));  // 窗体边框的颜色和笔画大小
+    QRectF rect(0, 0, this->width(), this->height());
+    painter.drawRoundedRect(rect, 10, 10);
+    painter.setFont(lpp->font());
+    painter.setPen(QPen(textColor, frameSize));
+    painter.drawText(rect, Qt::AlignHCenter | Qt::AlignVCenter, showStr);
+}
+
+void MessageTips::opacityTimer()
+{
+    opacity = opacity - closeSpeed;
+    if (opacity <= 0) {
+        mtimer->stop();
+        this->close();
+        return;
+    } else{
+        this->setWindowOpacity(opacity);
+	}
+}
+
+void MessageTips::timerDelayShutdown()
+{
+    mtimer->start(closeTime);
+}
+
+void MessageTips::showMessageTips(QString str, QWidget *parent)
+{
+    MessageTips *mMessageTips = new MessageTips(str, parent);
+    mMessageTips->setShowTime(1500);
+    mMessageTips->prepare();
+    mMessageTips->show();
+}
+
+void MessageTips::setShowTime(int time)
+{
+    showTime = time;
 }

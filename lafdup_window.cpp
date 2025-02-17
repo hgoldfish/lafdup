@@ -6,7 +6,9 @@
 #include <QtCore/qabstractitemmodel.h>
 #include <QtCore/qbuffer.h>
 #include <QtCore/qmimedata.h>
+#include <QtCore/qprocess.h>
 #include <QtCore/qsettings.h>
+#include <QtCore/qtextcodec.h>
 #include <QtCore/qtimer.h>
 #include <QtGui/qclipboard.h>
 #include <QtGui/qevent.h>
@@ -143,8 +145,10 @@ public:
         , mainWindow(mainWindow)
     {
     }
+
 public:
     bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     LafdupWindow *mainWindow;
 };
@@ -627,7 +631,7 @@ void LafdupWindow::loadConfiguration(bool withPassword)
     peer->setIgnorePassword(ignorePassword);
 }
 
-void moveToCenter(QWidget * const widget)
+void moveToCenter(QWidget *const widget)
 {
     QRect r = widget->geometry();
     r.moveCenter(QApplication::desktop()->screenGeometry(widget).center());
@@ -873,7 +877,7 @@ void ConfigureDialog::addPeer()
 void ConfigureDialog::onChangelanguage()
 {
     int ret = ui->cbBLanguage->currentIndex();
-    QString language;
+    QString language = "";
     switch (ret) {
     case 0:
         language = "English";

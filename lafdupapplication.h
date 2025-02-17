@@ -6,7 +6,9 @@
 #include <QtCore/qtranslator.h>
 #include <QtCore//qlocale.h>
 #include <QtWidgets/qapplication.h>
+
 #define lpp static_cast<LafdupApplication *>(QCoreApplication::instance())
+
 class LafdupApplication : public QApplication
 {
     Q_OBJECT
@@ -17,7 +19,7 @@ public:
 public:
     QString languageStr;
 private:
-    QTranslator *translationPtr;
+    QTranslator *translationPtr = nullptr;
 };
 
 #endif  // LAFDUPAPPLICATION_H

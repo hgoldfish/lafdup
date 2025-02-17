@@ -78,6 +78,7 @@ private:
 private:
     Ui::ConfigureDialog *ui;
     PeerModel *peerModel;
+
 };
 
 class MessageTips : public QWidget

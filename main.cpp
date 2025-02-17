@@ -1,3 +1,6 @@
+#include "lafdup_window.h"
+#include "lafdupapplication.h"
+#include "qtnetworkng.h"
 #include <QtCore/qcommandlineparser.h>
 #include <QtWidgets/qapplication.h>
 #include <QtWidgets/qstylefactory.h>
@@ -46,6 +49,7 @@ int main(int argc, char **argv)
     }
     sema.release();
 
+    lpp->translationLanguage();
     LafdupWindow w;
     if (!parser.isSet(minimizedOption)) {
         w.showAndGetFocus();

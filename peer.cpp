@@ -1,6 +1,6 @@
 #include <QtCore/qloggingcategory.h>
 #include <QtCore/qsettings.h>
-#include <QtCore/qscopeguard.h>
+#include <QtCore/qscopedvaluerollback.h>
 #include "discovery.h"
 #include "peer_p.h"
 
@@ -580,8 +580,7 @@ void LafdupPeer::_cleanFiles(const QDir &dir, bool cleanAll)
     if (cleaningFiles) {
         return;
     }
-    cleaningFiles = true;
-    auto cleanup = qScopeGuard([this] { cleaningFiles = false; });
+    QScopedValueRollback<bool> svr(cleaningFiles, true);
     const QDateTime &now = QDateTime::currentDateTime();
     for (const QFileInfo &fileInfo : dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
         if (!fileInfo.isWritable()) {

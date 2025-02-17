@@ -2,36 +2,35 @@
 
 LafdupApplication::LafdupApplication(int &argc, char **argv)
     : QApplication(argc, argv)
+    , translationPtr(nullptr)
 {
 }
 
 LafdupApplication::~LafdupApplication()
 {
-    if (Q_NULLPTR != translation_ptr) {
-        delete translation_ptr;
-        translation_ptr = Q_NULLPTR;
-    }
+    delete translationPtr;
 }
 
 void LafdupApplication::translationLanguage()
 {
-    if (Q_NULLPTR != translation_ptr) {
-        qApp->removeTranslator(translation_ptr);
-        delete translation_ptr;
-        translation_ptr = Q_NULLPTR;
+    if (nullptr != translationPtr) {
+        removeTranslator(translationPtr);
+        delete translationPtr;
+        translationPtr = nullptr;
     }
-    QSettings settings("/lafdup.ini", QSettings::IniFormat);
+    QSettings settings("lafdup.ini", QSettings::IniFormat);
     settings.beginGroup("Language");
     QString languageSetting = settings.value("languageValue").toString();
     settings.endGroup();
-    translation_ptr = new QTranslator;
+    translationPtr = new QTranslator;
+    languageStr = languageSetting;
     if (languageSetting == "Chinese_CN") {
-        if (translation_ptr->load(QLocale(), QLatin1String("lafdup"), QLatin1String("_"),
+        if (translationPtr->load(QLocale(), QLatin1String("lafdup"), QLatin1String("_"),
                                   QLatin1String(":/translations")))
-            qApp->installTranslator(translation_ptr);
+            installTranslator(translationPtr);
     } else {
-        if (translation_ptr->load(QLocale(), QLatin1String("lafdup"), QLatin1String("_"),
+        if (translationPtr->load(QLocale(), QLatin1String("lafdup"), QLatin1String("_"),
                                   QLatin1String(":/translations")))
-            qApp->removeTranslator(translation_ptr);
+            removeTranslator(translationPtr);
     }
 }

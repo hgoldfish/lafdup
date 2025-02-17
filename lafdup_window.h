@@ -1,14 +1,17 @@
 #ifndef LAFDUP_WINDOW_H
 #define LAFDUP_WINDOW_H
 #include <QtCore/qabstractitemmodel.h>
+#include <QtCore/qevent.h>
 #include <QtWidgets/qwidget.h>
 #include <QtWidgets/qsystemtrayicon.h>
+#include <QtCore/qcoreevent.h>
+#include <QtWidgets/qmessagebox.h>
 #include "peer.h"
-#include <QEvent>
+
 namespace Ui {
 class LafdupWindow;
 }
-
+class MessageTips;
 class CopyPasteModel;
 class LafdupWindow : public QWidget
 {
@@ -23,10 +26,11 @@ protected:
     virtual void closeEvent(QCloseEvent *event) override;
     virtual void dropEvent(QDropEvent *event) override;
     virtual void dragEnterEvent(QDragEnterEvent *event) override;
-    bool event(QEvent *e);
+    virtual bool event(QEvent *e) override;
 public slots:
     void sendContent();
     void showAndGetFocus();
+
 private slots:
     void updateClipboard(const CopyPaste &copyPaste);
     void onPeerStateChanged(bool ok);
@@ -40,6 +44,7 @@ private slots:
     void removeCopyPaste();
     void clearAll();
     void sendFiles();
+    void sendFileFailedTips(QString name, QString address);
 private:
     bool outgoing(const QString &text, bool ignoreLimits);
     bool outgoing(const QList<QUrl> urls, bool showError, bool ignoreLimits);

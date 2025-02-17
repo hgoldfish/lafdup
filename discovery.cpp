@@ -83,7 +83,8 @@ QSet<QPair<HostAddress, quint16>> LafdupDiscovery::getExtraKnownPeers()
 QSet<HostAddress> getMyIPs()
 {
     QSet<HostAddress> addresses;
-    for (const HostAddress &addr : NetworkInterface::allAddresses()) {
+    const auto &list = NetworkInterface::allAddresses();
+    for (const HostAddress &addr : list) {
         addresses.insert(addr);
     }
     return addresses;
@@ -92,7 +93,8 @@ QSet<HostAddress> getMyIPs()
 QStringList LafdupDiscovery::getAllBoundAddresses()
 {
     QStringList addresses;
-    for (const HostAddress &addr : NetworkInterface::allAddresses()) {
+    const auto &list = NetworkInterface::allAddresses();
+    for (const HostAddress &addr : list) {
         if (!addr.isLoopback() && !addr.isMulticast() && addr.protocol() == HostAddress::IPv4Protocol) {
             addresses.append(addr.toString());
         }
@@ -187,8 +189,10 @@ static QSet<HostAddress> allBroadcastAddresses()
 {
     QSet<HostAddress> addresses;
     addresses.insert(HostAddress::Broadcast);
-    for (const NetworkInterface &interface : NetworkInterface::allInterfaces()) {
-        for (const NetworkAddressEntry &entry : interface.addressEntries()) {
+    const auto &listall = NetworkInterface::allInterfaces();
+    for (const NetworkInterface &interface : listall) {
+        const auto &listadd = interface.addressEntries();
+        for (const NetworkAddressEntry &entry : listadd) {
             const HostAddress &addr = entry.broadcast();
             if (!addr.isNull()) {
                 addresses.insert(addr);
@@ -219,7 +223,8 @@ void LafdupDiscovery::discovery()
         }
         // prevent undefined behavior if addresses changed while broadcasting.
         QHash<QString, QPair<HostAddress, quint16>> addresses = this->knownPeers;
-        for (const QString &peerName : addresses.keys()) {
+        const auto &list = addresses.keys();
+        for (const QString &peerName : list) {
             const QPair<HostAddress, quint16> &addr = addresses.value(peerName);
             if (parent->hasPeer(peerName)) {
                 continue;
@@ -236,9 +241,15 @@ void LafdupDiscovery::discovery()
         }
 
         // prevent undefined behavior if addresses changed while broadcasting.
-        QSet<QPair<HostAddress, quint16>> extraKnownPeers = this->extraKnownPeers;
-        for (const QPair<HostAddress, quint16> &extraKnownPeer : extraKnownPeers) {
-            if (knownPeers.values().contains(extraKnownPeer)) {
+        for (const QPair<HostAddress, quint16> &extraKnownPeer : qAsConst(this->extraKnownPeers)) {
+            bool found = false;
+            for (const auto &value : qAsConst(knownPeers)) {
+                if (value == extraKnownPeer) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
                 continue;
             }
             if (parent->hasPeer(extraKnownPeer.first, extraKnownPeer.second)) {

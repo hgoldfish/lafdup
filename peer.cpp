@@ -29,7 +29,7 @@ bool LafdupRemoteStub::pasteText(const QDateTime &timestamp, const QString &text
     QPointer<LafdupPeer> peer(parent);
     callInEventLoopAsync([peer, item] {
         if (!peer.isNull()) {
-            peer->incoming(item);
+            emit peer->incoming(item);
         }
     });
     return true;
@@ -62,7 +62,8 @@ bool LafdupRemoteStub::pasteFiles(const QDateTime &timestamp, QSharedPointer<Rpc
     item.timestamp = timestamp;
     item.mimeType = BinaryType;
     QStringList fullPaths;
-    for (const QString &filePath : destDir.entryList(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Files | QDir::Hidden)) {
+    const auto &list = destDir.entryList(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Files | QDir::Hidden);
+    for (const QString &filePath : list) {
         fullPaths.append(destDir.absoluteFilePath(filePath));
     }
     item.files = fullPaths;
@@ -70,7 +71,7 @@ bool LafdupRemoteStub::pasteFiles(const QDateTime &timestamp, QSharedPointer<Rpc
     QPointer<LafdupPeer> parentRef(parent);
     callInEventLoopAsync([parentRef, item] {
         if (!parentRef.isNull()) {
-            parentRef->incoming(item);
+            emit parentRef->incoming(item);
         }
     });
     parent->writeInformation(destDir);
@@ -99,7 +100,7 @@ bool LafdupRemoteStub::pasteImage(const QDateTime &timestamp, QSharedPointer<Rpc
     QPointer<LafdupPeer> parentRef(parent);
     callInEventLoopAsync([parentRef, item] {
         if (!parentRef.isNull()) {
-            parentRef->incoming(item);
+            emit parentRef->incoming(item);
         }
     });
     return true;
@@ -148,7 +149,7 @@ bool LafdupPeer::start()
     QPointer<LafdupPeer> self(this);
     callInEventLoopAsync([self] {
         if (!self.isNull()) {
-            self->stateChanged(true);
+            emit self->stateChanged(true);
         }
     });
     return true;
@@ -163,7 +164,7 @@ void LafdupPeer::stop()
     QPointer<LafdupPeer> self(this);
     callInEventLoopAsync([self] {
         if (!self.isNull()) {
-            self->stateChanged(false);
+            emit self->stateChanged(false);
         }
     });
 }
@@ -231,8 +232,8 @@ void LafdupPeer::_outgoing(CopyPaste copyPaste)
             seconds = 60.0 * 60;  // one hour
         }
     }
-
-    for (const QString &peerName : rpc->getAllPeerNames()) {
+    const auto &list = rpc->getAllPeerNames();
+    for (const QString &peerName : list) {
         QList<QSharedPointer<Peer>> peers = rpc->getAll(peerName);
         // prefer tcp peers.
         std::sort(peers.begin(), peers.end(), lessThan);
@@ -281,6 +282,13 @@ void LafdupPeer::_outgoing(CopyPaste copyPaste)
                         result = peer->call("lafdup.pasteFiles", copyPaste.timestamp, QVariant::fromValue(rpcDir));
                         t->kill();
                         if (!result.toBool()) {
+                            QPointer<LafdupPeer> self(this);
+                            callInEventLoopAsync([self, peer] {
+                                if (self.isNull()) {
+                                    return;
+                                }
+                                self->sendFileFailed(peer->name(), peer->address());
+                            });
                             qCDebug(logger) << "can not paste to:" << peer->name() << peer->address();
                         } else {
                             break;
@@ -344,9 +352,9 @@ void LafdupPeer::outgoing(const CopyPaste &copyPaste)
 QString makeAddress(const QString &prefix, const HostAddress &addr, quint16 port)
 {
     if (addr.protocol() == HostAddress::IPv6Protocol) {
-        return QStringLiteral("%1://[%2]:%3").arg(prefix).arg(addr.toString()).arg(port);
+        return QStringLiteral("%1://[%2]:%3").arg(prefix, addr.toString()).arg(port);
     } else {
-        return QStringLiteral("%1://%2:%3").arg(prefix).arg(addr.toString()).arg(port);
+        return QStringLiteral("%1://%2:%3").arg(prefix, addr.toString()).arg(port);
     }
 }
 
@@ -354,7 +362,8 @@ bool LafdupPeer::hasPeer(const HostAddress &remoteHost, quint16 port)
 {
     const QString &kcpAddress = makeAddress("kcp", remoteHost, port);
     const QString &tcpAddress = makeAddress("tcp", remoteHost, port);
-    for (QSharedPointer<Peer> peer : rpc->getAllPeers()) {
+    const auto &list = rpc->getAllPeers();
+    for (const auto &peer : list) {
         if (peer->address() == kcpAddress || peer->address() == tcpAddress) {
             return true;
         }
@@ -370,7 +379,8 @@ bool LafdupPeer::hasPeer(const QString &peerName)
 void LafdupPeer::tryToConnectPeer(QString itsPeerName, HostAddress remoteHost, quint16 port)
 {
     operations->spawn([this, itsPeerName, remoteHost, port] {
-        for (QSharedPointer<Peer> oldPeer : rpc->getAll(itsPeerName)) {
+        const auto &list = rpc->getAll(itsPeerName);
+        for (QSharedPointer<Peer> oldPeer : list) {
             if (!oldPeer.isNull()) {
                 try {
                     oldPeer->call("lafdup.ping");
@@ -478,7 +488,8 @@ void LafdupPeer::setPassword(QByteArray password)
         if (!cipher->isValid()) {
             return;
         }
-        for (QSharedPointer<Peer> peer : rpc->getAllPeers()) {
+        const auto &list = rpc->getAllPeers();
+        for (QSharedPointer<Peer> peer : list) {
             peer->close();
         }
     });
@@ -535,7 +546,7 @@ quint16 LafdupPeer::getDefaultPort()
 
 bool LafdupPeer::findItem(const QDateTime &timestamp)
 {
-    for (const CopyPaste &item : items) {
+    for (const CopyPaste &item : qAsConst(items)) {
         if (item.timestamp == timestamp) {
             return true;
         }
@@ -547,6 +558,7 @@ void LafdupPeer::writeInformation(const QDir destDir)
 {
     const QString &iniFilePath = destDir.filePath("lafdup.ini");
     QSettings settings(iniFilePath, QSettings::IniFormat);
+    settings.setIniCodec("UTF-8");
     settings.beginGroup("clean_files");
     settings.setValue("created", QDateTime::currentDateTime());
 }
@@ -582,7 +594,8 @@ void LafdupPeer::_cleanFiles(const QDir &dir, bool cleanAll)
     }
     QScopedValueRollback<bool> svr(cleaningFiles, true);
     const QDateTime &now = QDateTime::currentDateTime();
-    for (const QFileInfo &fileInfo : dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+    const auto &list = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QFileInfo &fileInfo : list) {
         if (!fileInfo.isWritable()) {
             continue;
         }
@@ -641,7 +654,7 @@ QString VirtualRpcDirFileProvider::makePath(const QString &filePath)
     const QString &name = parts.at(0);
     const QStringList &subpaths = parts.mid(1);
 
-    for (const QFileInfo &fileInfo : this->fileInfoList) {
+    for (const QFileInfo &fileInfo : qAsConst(this->fileInfoList)) {
         if (fileInfo.fileName() == name) {
             QString path = fileInfo.filePath();
             if (subpaths.isEmpty()) {
@@ -678,7 +691,8 @@ static void _populate(const QDir &dir, const QString &relativePath, PopulateResu
 {
     QDir::Filters filters = QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot | QDir::Readable | QDir::Hidden;
     //    QDir::Filters filters = QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot;
-    for (const QFileInfo &fileInfo : dir.entryInfoList(filters, QDir::DirsFirst)) {
+    const auto &list = dir.entryInfoList(filters, QDir::DirsFirst);
+    for (const QFileInfo &fileInfo : list) {
         RpcDirFileEntry entry;
         const QString &name = fileInfo.fileName();
         if (Q_UNLIKELY(name.contains("/"))) {
@@ -712,7 +726,7 @@ static PopulateResult populate(const QDir &dir, const QString &name)
 PopulateResult VirtualRpcDirFileProvider::populate()
 {
     PopulateResult result;
-    for (const QFileInfo &fileInfo : fileInfoList) {
+    for (const QFileInfo &fileInfo : qAsConst(fileInfoList)) {
         if (fileInfo.isDir()) {
             QString name = fileInfo.fileName();
             RpcDirFileEntry entry;

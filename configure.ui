@@ -113,7 +113,7 @@
         </sizepolicy>
        </property>
        <property name="currentIndex">
-        <number>5</number>
+        <number>2</number>
        </property>
        <widget class="QWidget" name="pagePasteFiles">
         <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -698,13 +698,13 @@
         </layout>
        </widget>
        <widget class="QWidget" name="pageLanguage">
-        <widget class="QWidget" name="">
+        <widget class="QWidget" name="layoutWidget">
          <property name="geometry">
           <rect>
            <x>40</x>
            <y>70</y>
            <width>371</width>
-           <height>22</height>
+           <height>24</height>
           </rect>
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_9" stretch="0,3,2,0,1,0">

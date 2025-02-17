@@ -86,7 +86,7 @@
     <message>
         <location filename="../configure.ui"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sync Clipboard uses AES/SHA256 to protect the data transmition between computers. All personal computers and mobile phones use the same password here. Note: this password is stored in the Windows registry in clear text. &lt;span style=&quot; font-weight:600;&quot;&gt;DO NOT use the same password of your critical data.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;同步剪贴板使用AES/SHA256来保护计算机之间的数据传输。所有的个人电脑和手机都使用相同的密码。注意：此密码以明文形式存储在Windows注册表中。 &lt;span style=&quot; font-weight:600;&quot;&gt;DO NOT use the same password of your critical data.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;同步剪贴板使用AES/SHA256来保护计算机之间的数据传输。所有的个人电脑和手机都使用相同的密码。注意：此密码以明文形式存储在Windows注册表中。 &lt;span style=&quot; font-weight:600;&quot;&gt;为了数据安全对于重要数据不要使用一样的密码.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <location filename="../configure.ui"/>
@@ -129,22 +129,22 @@
         <translation></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="802"/>
+        <location filename="../lafdup_window.cpp" line="830"/>
         <source>Select Cache Directory to Receive Files.</source>
         <translation>选择内存目录接收文件</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="834"/>
+        <location filename="../lafdup_window.cpp" line="862"/>
         <source>%1 is not a valid IP.</source>
         <translation>%1不是一个有效IP</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="860"/>
+        <location filename="../lafdup_window.cpp" line="888"/>
         <source>changeLanguage</source>
         <translation>修改语言</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="860"/>
+        <location filename="../lafdup_window.cpp" line="888"/>
         <source>Whether or not to change the language used by the program</source>
         <translation>是否确定修改本程序的默认语言</translation>
     </message>
@@ -177,7 +177,8 @@
 <context>
     <name>CopyPasteModel</name>
     <message>
-        <location filename="../lafdup_window.cpp" line="46"/>
+        <location filename="../lafdup_window.cpp" line="43"/>
+        <location filename="../lafdup_window.cpp" line="67"/>
         <source>&lt;Spaces&gt;</source>
         <translation>&lt;空格&gt;</translation>
     </message>
@@ -224,7 +225,9 @@
         <source>Other Peers:
 192.168.199.2
 10.1.1.2</source>
-        <translation>其他节点</translation>
+        <translation>其他节点:
+192.168.199.2 
+10.1.1.2</translation>
     </message>
     <message>
         <location filename="../main.ui"/>
@@ -272,37 +275,44 @@
         <translation>删除选中项目</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="211"/>
+        <location filename="../lafdup_window.cpp" line="225"/>
         <source>Can not bind to port %1. Will not synchronize from other phone/pc.</source>
         <translation>无法绑定到端口%1。不会从其他手机或PC同步..</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="223"/>
+        <location filename="../lafdup_window.cpp" line="237"/>
         <source>Sync Clipboard is minimized to tray icon.</source>
         <translation>同步剪贴板被最小化到托盘图标。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="292"/>
+        <location filename="../lafdup_window.cpp" line="306"/>
         <source>can not send urls as files. this is a programming bug.</source>
         <translation>不能将url作为文件发送。这是一个编程错误.</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="296"/>
+        <location filename="../lafdup_window.cpp" line="310"/>
         <source>can not send files. some file is moved.</source>
         <translation>不能发送文件，某些文件被移动。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="349"/>
+        <location filename="../lafdup_window.cpp" line="363"/>
         <source>Can not send empty content.</source>
         <translation>发送内容不能为空。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="360"/>
+        <location filename="../lafdup_window.cpp" line="374"/>
         <source>select files to send.</source>
         <translation>选择文件发送。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="527"/>
+        <location filename="../lafdup_window.cpp" line="384"/>
+        <source>send  %1 to %2 failed 
+ The peer party may not set the path for receiving files</source>
+        <translation>发送 %1 给 %2 失败了
+对方可能没有设置接收文件的路径</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="548"/>
         <source>My IP Addresses:</source>
         <translation>我的IP地址：</translation>
     </message>
@@ -320,14 +330,27 @@
         <translation>同步剪贴板使用AES/SHA256来保护计算机之间的数据传输。所有的个人电脑和手机都使用相同的密码。注意：此密码以明文形式存储在Windows注册表中。不要对关键数据使用相同的密码。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="642"/>
+        <location filename="../lafdup_window.cpp" line="664"/>
         <source>Password is empty.</source>
         <translation>密码为空。</translation>
     </message>
     <message>
         <location filename="../password.ui"/>
         <source>Password for sending content</source>
-        <translation type="unfinished"></translation>
+        <translation>发送内容密码</translation>
+    </message>
+</context>
+<context>
+    <name>QObject</name>
+    <message>
+        <location filename="../main.cpp" line="42"/>
+        <source>tips</source>
+        <translation>提示</translation>
+    </message>
+    <message>
+        <location filename="../main.cpp" line="43"/>
+        <source>The program is running, please exit first if necessary</source>
+        <translation>已有程序在运行，如有需要请先退出</translation>
     </message>
 </context>
 </TS>

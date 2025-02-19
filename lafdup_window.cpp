@@ -3,6 +3,7 @@
 #include "ui_configure.h"
 #include "ui_main.h"
 #include "ui_password.h"
+#include "ui_guide.h"
 #include <QtCore/qabstractitemmodel.h>
 #include <QtCore/qbuffer.h>
 #include <QtCore/qmimedata.h>
@@ -14,6 +15,7 @@
 #include <QtWidgets/qdesktopwidget.h>
 #include <QtWidgets/qfiledialog.h>
 #include <QtWidgets/qmenu.h>
+#include <QtCore/qstandardpaths.h>
 
 using namespace qtng;
 
@@ -200,11 +202,20 @@ LafdupWindow::LafdupWindow()
     connect(peer.data(), &LafdupPeer::stateChanged, this, &LafdupWindow::onPeerStateChanged);
     connect(peer.data(), &LafdupPeer::incoming, this, &LafdupWindow::updateClipboard);
     connect(peer.data(), &LafdupPeer::sendFileFailed, this, &LafdupWindow::sendFileFailedTips);
+    connect(peer.data(), &LafdupPeer::sendFeedBack, this, &LafdupWindow::sendFeedBackTips);
+    connect(peer.data(), &LafdupPeer::sendAction, this, &LafdupWindow::sendAction);
 
     loadConfiguration(true);
     started = peer->start();
     setAcceptDrops(true);
     ui->txtContent->setAcceptDrops(false);
+
+    guide = new GuideDialog(this);
+    connect(guide, &GuideDialog::accepted, this, &LafdupWindow::guideAction);
+    QSettings settings;
+    if (settings.value("password").toString().isEmpty()) {
+        guide->show();
+    }
 }
 
 LafdupWindow::~LafdupWindow()
@@ -383,6 +394,32 @@ void LafdupWindow::sendFileFailedTips(QString name, QString address)
     QString tipStr =
             tr("send  %1 to %2 failed \n The peer party may not set the path for receiving files").arg(name, address);
     MessageTips::showMessageTips(tipStr, this);
+}
+
+void LafdupWindow::sendFeedBackTips(QString tips)
+{
+    QString tipStr = tr("%1").arg(tips);
+    MessageTips::showMessageTips(tipStr, this);
+}
+
+void LafdupWindow::sendAction()
+{
+    QString tipStr = "Start sending";
+    MessageTips::showMessageTips(tipStr, this);
+}
+
+void LafdupWindow::guideAction()
+{
+    if (guide->getPassword().isEmpty()) {
+        guide->show();
+        return;
+    }
+    QString password = guide->getPassword();
+    QString recvFilePath = guide->getDirectory();
+    QSettings settings;
+    settings.setValue("password", password);
+    settings.setValue("cache_dir", recvFilePath);
+    showAndGetFocus();
 }
 
 void LafdupWindow::onClipboardChanged()
@@ -736,7 +773,7 @@ ConfigureDialog::ConfigureDialog(QWidget *parent)
     connect(ui->chkDeleteFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onDeleteFilesChanged);
     connect(ui->chkSendFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onSendFilesChanged);
     connect(ui->chkOnlySendSmallFile, &QCheckBox::stateChanged, this, &ConfigureDialog::onOnlySendSmallFileChanged);
-    connect(ui->btnChangeLanguage, &QPushButton::clicked, this, &ConfigureDialog::onChangelanguage);
+    // connect(ui->btnChangeLanguage, &QPushButton::clicked, this, &ConfigureDialog::onChangelanguage);
 }
 
 ConfigureDialog::~ConfigureDialog()
@@ -762,6 +799,7 @@ void ConfigureDialog::accept()
     settings.setValue("only_send_small_files", ui->chkOnlySendSmallFile->isChecked());
     settings.setValue("send_files_size", ui->spinSendFileSize->value());
     settings.setValue("ignore_password", ui->chkIgnorePassword->isChecked());
+    this->onChangelanguage();
     QDialog::accept();
 }
 
@@ -883,14 +921,10 @@ void ConfigureDialog::onChangelanguage()
     default:
         break;
     }
-    QMessageBox::StandardButton result = QMessageBox::question(
-            this, tr("changeLanguage"), tr("Whether or not to change the language used by the program"));
-    if (result == QMessageBox::Yes) {
-        QSettings setting;
-        setting.setValue("language", language);
-        lpp->translationLanguage();
-        ui->retranslateUi(this);
-    }
+    QSettings setting;
+    setting.setValue("language", language);
+    lpp->translationLanguage();
+    ui->retranslateUi(this);
 }
 
 void ConfigureDialog::removeSelectedPeer()
@@ -966,9 +1000,9 @@ void MessageTips::opacityTimer()
         mtimer->stop();
         this->close();
         return;
-    } else{
+    } else {
         this->setWindowOpacity(opacity);
-	}
+    }
 }
 
 void MessageTips::timerDelayShutdown()
@@ -987,4 +1021,56 @@ void MessageTips::showMessageTips(QString str, QWidget *parent)
 void MessageTips::setShowTime(int time)
 {
     showTime = time;
+}
+
+void MessageTips::backgroundColor(QColor color)
+{
+    bgColor = color;
+}
+
+GuideDialog::GuideDialog(QWidget *parent)
+    : QDialog(parent)
+    , ui(new Ui::GuideDialog)
+{
+    ui->setupUi(this);
+    moveToCenter(this);
+    connect(ui->btnBrowse, &QPushButton::clicked, this, &GuideDialog::setRecvFileDirectory);
+    QString newPath=QStandardPaths::writableLocation(QStandardPaths::CacheLocation)+"/recvFile";
+    QDir dir(newPath);
+    if (!dir.exists()){
+        if(dir.mkpath(newPath)){
+            qDebug()<<"创建成功";
+        }else{
+            qDebug()<<"创建失败";
+        }
+    }else{
+        qDebug()<<"文件已存在";
+    }
+    ui->textDir->setText(newPath);
+    ui->textDir->setToolTip(ui->textDir->text());
+    this->setWindowTitle(tr("Setting Guide"));
+}
+
+GuideDialog::~GuideDialog()
+{
+    delete ui;
+}
+
+void GuideDialog::setRecvFileDirectory()
+{
+    const QString &path = QFileDialog::getExistingDirectory(this, tr("Select Cache Directory to Receive Files."));
+    if (path.isEmpty()) {
+        return;
+    }
+    ui->textDir->setText(path);
+}
+
+QString GuideDialog::getPassword()
+{
+    return ui->textPwd->text();
+}
+
+QString GuideDialog::getDirectory()
+{
+    return ui->textDir->text();
 }

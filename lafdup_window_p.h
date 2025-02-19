@@ -9,6 +9,7 @@
 namespace Ui {
 class PasswordDialog;
 class ConfigureDialog;
+class GuideDialog;
 }  // namespace Ui
 
 class CopyPasteModel : public QAbstractListModel
@@ -89,6 +90,7 @@ public:
     void prepare();
     void setCloseTimeSpeed(int closeTime = 100, double closeSpeed = 0.1);
     void setShowTime(int time);
+    void backgroundColor(QColor color);
     static void showMessageTips(QString str, QWidget *parent = nullptr);
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -106,6 +108,22 @@ private:
     int showTime = 5000;  // 显示时间
     int closeTime = 100;  // 关闭需要时间
     double closeSpeed = 0.1;  // 窗体消失的平滑度，大小0~1
-    QTimer *mtimer=nullptr;
+    QTimer *mtimer = nullptr;
 };
+
+class GuideDialog : public QDialog
+{
+    Q_OBJECT
+public:
+    GuideDialog(QWidget *parent);
+    ~GuideDialog();
+private slots:
+    void setRecvFileDirectory();
+public:
+    QString getPassword();
+    QString getDirectory();
+private:
+    Ui::GuideDialog *ui;
+};
+
 #endif

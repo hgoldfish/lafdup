@@ -31,6 +31,8 @@ signals:
     void incoming(const CopyPaste &copyPaste);
     void stateChanged(bool ok);
     void sendFileFailed(QString name,QString address);
+    void sendFeedBack(QString str);
+    void sendAction();
 protected:
     bool hasPeer(const qtng::HostAddress &remoteHost, quint16 port);
     bool hasPeer(const QString &peerName);

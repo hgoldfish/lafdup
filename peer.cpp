@@ -233,6 +233,11 @@ void LafdupPeer::_outgoing(CopyPaste copyPaste)
         }
     }
     const auto &list = rpc->getAllPeerNames();
+    if (list.isEmpty()) {
+        emit sendFeedBack(tr("Failed to send, no one accepted"));
+    } else {
+        emit sendAction();
+    }
     for (const QString &peerName : list) {
         QList<QSharedPointer<Peer>> peers = rpc->getAll(peerName);
         // prefer tcp peers.
@@ -248,9 +253,24 @@ void LafdupPeer::_outgoing(CopyPaste copyPaste)
                 for (QSharedPointer<Peer> peer : peers) {
                     try {
                         result = peer->call("lafdup.pasteText", copyPaste.timestamp, copyPaste.text);
+                        QPointer<LafdupPeer> self(this);
                         if (!result.toBool()) {
+                            callInEventLoopAsync([self, peer] {
+                                if (self.isNull()) {
+                                    return;
+                                }
+                                QString feedStr = tr("send %1 to %2 failed").arg(peer->name(), peer->address());
+                                self->sendFeedBack(feedStr);
+                            });
                             qCDebug(logger) << "can not paste to:" << peer->name() << peer->address();
                         } else {
+                            callInEventLoopAsync([self, peer] {
+                                if (self.isNull()) {
+                                    return;
+                                }
+                                QString feedStr = tr("Sent successfully");
+                                self->sendFeedBack(feedStr);
+                            });
                             break;
                         }
                     } catch (RpcException &e) {
@@ -281,8 +301,8 @@ void LafdupPeer::_outgoing(CopyPaste copyPaste)
                     try {
                         result = peer->call("lafdup.pasteFiles", copyPaste.timestamp, QVariant::fromValue(rpcDir));
                         t->kill();
+                        QPointer<LafdupPeer> self(this);
                         if (!result.toBool()) {
-                            QPointer<LafdupPeer> self(this);
                             callInEventLoopAsync([self, peer] {
                                 if (self.isNull()) {
                                     return;
@@ -291,6 +311,13 @@ void LafdupPeer::_outgoing(CopyPaste copyPaste)
                             });
                             qCDebug(logger) << "can not paste to:" << peer->name() << peer->address();
                         } else {
+                            callInEventLoopAsync([self, peer] {
+                                if (self.isNull()) {
+                                    return;
+                                }
+                                QString feedStr = tr("Sent successfully");
+                                self->sendFeedBack(feedStr);
+                            });
                             break;
                         }
                     } catch (RpcException &e) {
@@ -312,9 +339,24 @@ void LafdupPeer::_outgoing(CopyPaste copyPaste)
                     try {
                         result = peer->call("lafdup.pasteImage", copyPaste.timestamp, QVariant::fromValue(rpcFile));
                         t->kill();
+                        QPointer<LafdupPeer> self(this);
                         if (!result.toBool()) {
+                            callInEventLoopAsync([self, peer] {
+                                if (self.isNull()) {
+                                    return;
+                                }
+                                QString feedStr = tr("send %1 to %2 failed").arg(peer->name(), peer->address());
+                                self->sendFeedBack(feedStr);
+                            });
                             qCDebug(logger) << "can not paste to:" << peer->name() << peer->address();
                         } else {
+                            callInEventLoopAsync([self, peer] {
+                                if (self.isNull()) {
+                                    return;
+                                }
+                                QString feedStr = tr("Sent successfully");
+                                self->sendFeedBack(feedStr);
+                            });
                             break;
                         }
                     } catch (RpcException &e) {

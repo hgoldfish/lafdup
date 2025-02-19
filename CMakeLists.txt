@@ -30,6 +30,7 @@ set(LAFDUP_SRC
     lafdupapplication.h
     lafdupapplication.cpp
     lafdup.qrc
+    images/logo.rc
 
     peer.h
     peer_p.h
@@ -43,6 +44,7 @@ set(LAFDUP_SRC
     main.ui
     password.ui
     configure.ui
+    guide.ui
 )
 
 add_definitions(-DQT_NO_CAST_TO_ASCII)
@@ -50,7 +52,8 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
 endif()
 
-add_executable(lafdup WIN32 ${LAFDUP_SRC})
+add_executable(lafdup WIN32 ${LAFDUP_SRC}
+)
 target_link_libraries(lafdup Qt5::Widgets Qt5::Core lafrpc)
 
 #查找Qt翻译工具
@@ -72,3 +75,5 @@ qt5_create_translation(QM_FILES ${TS_FILES} ${LAFDUP_SRC} OPTIONS -no-obsolete -
 # 添加更新翻译的目标
 add_custom_target(lupdate_task DEPENDS ${TS_FILES})
 add_custom_target(lrelease_task DEPENDS ${QM_FILES})
+
+

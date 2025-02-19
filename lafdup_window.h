@@ -9,6 +9,7 @@
 namespace Ui {
 class LafdupWindow;
 }
+class GuideDialog;
 class MessageTips;
 class CopyPasteModel;
 class LafdupWindow : public QWidget
@@ -42,6 +43,9 @@ private slots:
     void clearAll();
     void sendFiles();
     void sendFileFailedTips(QString name, QString address);
+    void sendFeedBackTips(QString tips);
+    void sendAction();
+    void guideAction();
 private:
     bool outgoing(const QString &text, bool ignoreLimits);
     bool outgoing(const QList<QUrl> urls, bool showError, bool ignoreLimits);
@@ -56,6 +60,7 @@ private:
     QSystemTrayIcon *trayIcon;
     QMenu *trayMenu;
     bool started;
+    GuideDialog *guide;
 };
 
 #endif

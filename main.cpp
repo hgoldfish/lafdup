@@ -46,9 +46,13 @@ int main(int argc, char **argv)
     }
     sema.release();
 
+    QSettings settings;
     LafdupWindow w;
-    if (!parser.isSet(minimizedOption)) {
-        w.showAndGetFocus();
+    if (!settings.value("password").toString().isEmpty()) {
+        if (!parser.isSet(minimizedOption)) {
+            w.showAndGetFocus();
+        }
     }
+
     return qtng::startQtLoop();
 }

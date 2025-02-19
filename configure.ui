@@ -113,7 +113,7 @@
         </sizepolicy>
        </property>
        <property name="currentIndex">
-        <number>2</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="pagePasteFiles">
         <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -703,11 +703,11 @@
           <rect>
            <x>40</x>
            <y>70</y>
-           <width>371</width>
+           <width>301</width>
            <height>24</height>
           </rect>
          </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_9" stretch="0,3,2,0,1,0">
+         <layout class="QHBoxLayout" name="horizontalLayout_9" stretch="0,3,2,0">
           <item>
            <spacer name="horizontalSpacer_11">
             <property name="orientation">
@@ -761,32 +761,6 @@
             </property>
             <property name="sizeType">
              <enum>QSizePolicy::Fixed</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnChangeLanguage">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="text">
-             <string>change</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <spacer name="horizontalSpacer_12">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>

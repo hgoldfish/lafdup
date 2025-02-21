@@ -1,18 +1,21 @@
-#include <QtCore/qabstractitemmodel.h>
-#include <QtCore/qsettings.h>
-#include <QtCore/qtimer.h>
-#include <QtCore/qmimedata.h>
-#include <QtCore/qbuffer.h>
-#include <QtGui/qevent.h>
-#include <QtGui/qclipboard.h>
-#include <QtWidgets/qmessagebox.h>
-#include <QtWidgets/qmenu.h>
-#include <QtWidgets/qdesktopwidget.h>
-#include <QtWidgets/qfiledialog.h>
-#include "lafdup_window_p.h"
+﻿#include "lafdup_window_p.h"
+#include "lafdupapplication.h"
+#include "ui_configure.h"
 #include "ui_main.h"
 #include "ui_password.h"
-#include "ui_configure.h"
+#include "ui_guide.h"
+#include <QtCore/qabstractitemmodel.h>
+#include <QtCore/qbuffer.h>
+#include <QtCore/qmimedata.h>
+#include <QtCore/qsettings.h>
+#include <QtCore/qtimer.h>
+#include <QtGui/qclipboard.h>
+#include <QtGui/qevent.h>
+#include <QtGui/qpainter.h>
+#include <QtWidgets/qdesktopwidget.h>
+#include <QtWidgets/qfiledialog.h>
+#include <QtWidgets/qmenu.h>
+#include <QtCore/qstandardpaths.h>
 
 using namespace qtng;
 
@@ -38,9 +41,8 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
         if (copyPaste.isText()) {
             const QString &cleanedText =
                     copyPaste.text.trimmed().left(128).replace("\n", "").replace("\b*", " ").left(32);
-            const QString &text = QStringLiteral("%2\n%1")
-                                          .arg(copyPaste.timestamp.time().toString(Qt::ISODate))
-                                          .arg(cleanedText.isEmpty() ? tr("<Spaces>") : cleanedText);
+            const QString &text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate),
+                                                               cleanedText.isEmpty() ? tr("<Spaces>") : cleanedText);
             return text;
         } else if (copyPaste.isFile()) {
             QStringList fileNames;
@@ -59,6 +61,22 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
         } else {
             return QIcon(":/images/ic_file_upload_black_48dp.png").pixmap(QSize(32, 32));
             ;
+        }
+    } else if (role == Qt::ToolTipRole) {
+        if (copyPaste.isText()) {
+            const QString &text =
+                    QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate),
+                                                 copyPaste.text.isEmpty() ? tr("<Spaces>") : copyPaste.text);
+            return text;
+        } else if (copyPaste.isFile()) {
+            QStringList fileNames;
+            for (const QString &path : copyPaste.files) {
+                QFileInfo fileInfo(path);
+                fileNames.append(fileInfo.absoluteFilePath());
+            }
+            return fileNames.join("\n");
+        } else if (copyPaste.isImage()) {
+            return "Image";
         }
     }
 
@@ -79,7 +97,8 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
 
 QModelIndex CopyPasteModel::addCopyPaste(const CopyPaste &copyPaste)
 {
-    for (const CopyPaste &old : copyPasteList) {
+    const auto &list = copyPasteList;
+    for (const CopyPaste &old : list) {
         if (old.direction == copyPaste.direction && old.timestamp == copyPaste.timestamp) {
             return QModelIndex();
         }
@@ -182,10 +201,14 @@ LafdupWindow::LafdupWindow()
 
     connect(peer.data(), &LafdupPeer::stateChanged, this, &LafdupWindow::onPeerStateChanged);
     connect(peer.data(), &LafdupPeer::incoming, this, &LafdupWindow::updateClipboard);
+    connect(peer.data(), &LafdupPeer::sendFileFailed, this, &LafdupWindow::sendFileFailedTips);
+    connect(peer.data(), &LafdupPeer::sendFeedBack, this, &LafdupWindow::sendFeedBackTips);
+    connect(peer.data(), &LafdupPeer::sendAction, this, &LafdupWindow::sendAction);
 
     loadConfiguration(true);
     started = peer->start();
     setAcceptDrops(true);
+    ui->txtContent->setAcceptDrops(false);
 }
 
 LafdupWindow::~LafdupWindow()
@@ -241,6 +264,14 @@ void LafdupWindow::dragEnterEvent(QDragEnterEvent *event)
     if (mimeData->hasUrls()) {
         event->acceptProposedAction();
     }
+}
+
+bool LafdupWindow::event(QEvent *e)
+{
+    if (e->type() == QEvent::LanguageChange) {
+        ui->retranslateUi(this);
+    }
+    return QWidget::event(e);
 }
 
 bool LafdupWindow::outgoing(const QString &text, bool ignoreLimits)
@@ -351,6 +382,29 @@ void LafdupWindow::sendFiles()
     outgoing(fileUrls, true, true);
 }
 
+void LafdupWindow::sendFileFailedTips(QString name, QString address)
+{
+    QString tipStr =
+            tr("send  %1 to %2 failed \n The peer party may not set the path for receiving files").arg(name, address);
+    MessageTips::showMessageTips(tipStr, this);
+}
+
+void LafdupWindow::sendFeedBackTips(QString tips)
+{
+    QString tipStr = tips;
+    MessageTips::showMessageTips(tipStr, this);
+}
+
+void LafdupWindow::sendAction()
+{
+    QString tipStr = "Start sending";
+    MessageTips::showMessageTips(tipStr, this);
+}
+
+void LafdupWindow::guideAction()
+{
+}
+
 void LafdupWindow::onClipboardChanged()
 {
     const QClipboard *clipboard = QApplication::clipboard();
@@ -382,7 +436,7 @@ DisableSyncClipboard::DisableSyncClipboard(QClipboard *clipboard, LafdupWindow *
 DisableSyncClipboard::~DisableSyncClipboard()
 {
     QPointer<LafdupWindow> windowRef(window);
-    QTimer::singleShot(100, [windowRef] {
+    QTimer::singleShot(100, windowRef, [windowRef] {
         if (windowRef.isNull()) {
             return;
         }
@@ -513,7 +567,8 @@ void LafdupWindow::updateMyIP()
 {
     QString text = tr("My IP Addresses:");
     text.append("\n");
-    for (const QString &ip : peer->getAllBoundAddresses()) {
+    const auto &list = peer->getAllBoundAddresses();
+    for (const QString &ip : list) {
         text.append(ip);
         text.append("\n");
     }
@@ -576,7 +631,7 @@ void LafdupWindow::loadConfiguration(bool withPassword)
     if (sendFiles) {
         bool onlySendSmallFiles = settings.value("only_send_small_files", true).toBool();
         if (!onlySendSmallFiles) {
-            peer->setSendFilesSize(INT_MAX);  // unlimited
+            peer->setSendFilesSize(float(INT_MAX));  // unlimited
         } else {
             float sendFilesSize = settings.value("send_files_size", 100.0).toFloat(&ok);
             if (!ok) {
@@ -701,6 +756,7 @@ ConfigureDialog::ConfigureDialog(QWidget *parent)
     connect(ui->chkDeleteFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onDeleteFilesChanged);
     connect(ui->chkSendFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onSendFilesChanged);
     connect(ui->chkOnlySendSmallFile, &QCheckBox::stateChanged, this, &ConfigureDialog::onOnlySendSmallFileChanged);
+    // connect(ui->btnChangeLanguage, &QPushButton::clicked, this, &ConfigureDialog::onChangelanguage);
 }
 
 ConfigureDialog::~ConfigureDialog()
@@ -726,6 +782,9 @@ void ConfigureDialog::accept()
     settings.setValue("only_send_small_files", ui->chkOnlySendSmallFile->isChecked());
     settings.setValue("send_files_size", ui->spinSendFileSize->value());
     settings.setValue("ignore_password", ui->chkIgnorePassword->isChecked());
+    settings.setValue("isMinimized",ui->chkStartMin->isChecked());
+    this->onChangelanguage();
+    appAutoRun(ui->chkAutoStart->isChecked());
     QDialog::accept();
 }
 
@@ -734,6 +793,7 @@ void ConfigureDialog::loadSettings()
     QSettings settings;
     const QStringList &knownPeers = settings.value("known_peers").toStringList();
     const QString &cacheDirPath = settings.value("cache_dir").toString();
+    const QString &password=settings.value("password").toString();
     bool deleteFiles = settings.value("delete_files", true).toBool();
     bool ok;
     int deleteFilesTime = settings.value("delete_files_time", 30).toInt(&ok);
@@ -750,6 +810,7 @@ void ConfigureDialog::loadSettings()
         sendFilesSize = 100.0;
     }
     bool ignorePassword = settings.value("ignore_password", false).toBool();
+    bool isMinmized=settings.value("isMinimized").toBool();
     peerModel->setPeers(knownPeers);
     ui->lstIPs->setModel(peerModel);
     ui->txtCacheDirectory->setText(cacheDirPath);
@@ -758,6 +819,8 @@ void ConfigureDialog::loadSettings()
     ui->chkSendFiles->setChecked(sendFiles);
     ui->chkOnlySendSmallFile->setChecked(onlySendSmallFiles);
     ui->spinSendFileSize->setValue(sendFilesSize);
+    ui->txtPassword->setText(password);
+    ui->chkStartMin->setChecked(isMinmized);
     if (!cacheDirPath.isEmpty()) {
         ui->chkDeleteFiles->setEnabled(true);
         ui->spinDeleteFilesTime->setEnabled(true);
@@ -767,6 +830,25 @@ void ConfigureDialog::loadSettings()
         ui->spinSendFileSize->setEnabled(false);
     }
     ui->chkIgnorePassword->setChecked(ignorePassword);
+    if (lpp->languageStr == "Chinese_CN") {
+        ui->cbBLanguage->setCurrentIndex(1);
+    } else {
+        ui->cbBLanguage->setCurrentIndex(0);
+    }
+    QSettings autoRunSetting("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",QSettings::NativeFormat);
+    ui->chkAutoStart->setChecked(!autoRunSetting.value("GigaCores").isNull());
+}
+
+void ConfigureDialog::appAutoRun(bool checked)
+{
+    QString application_name = QString::fromUtf8("GigaCores");
+    QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",QSettings::NativeFormat);
+    if(checked){
+        QString application_path = QApplication::applicationFilePath();
+        settings.setValue(application_name, application_path.replace("/", "\\"));
+    }else{
+        settings.remove(application_name);
+    }
 }
 
 bool ConfigureDialog::isPasswordChanged()
@@ -828,10 +910,183 @@ void ConfigureDialog::addPeer()
     }
 }
 
+void ConfigureDialog::onChangelanguage()
+{
+    int ret = ui->cbBLanguage->currentIndex();
+    QString language;
+    switch (ret) {
+    case 0:
+        language = "English";
+        break;
+    case 1:
+        language = "Chinese_CN";
+        break;
+    default:
+        break;
+    }
+    QSettings setting;
+    setting.setValue("language", language);
+    lpp->translationLanguage();
+    ui->retranslateUi(this);
+}
+
 void ConfigureDialog::removeSelectedPeer()
 {
     const QModelIndex &current = ui->lstIPs->currentIndex();
     if (current.isValid()) {
         peerModel->removePeer(current);
     }
+}
+
+MessageTips::MessageTips(const QString &str, QWidget *partent)
+    : QWidget(partent)
+    , showStr(str)
+{
+    setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
+    this->setAttribute(Qt::WA_TranslucentBackground);
+    this->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    this->setAttribute(Qt::WA_DeleteOnClose);
+    this->setFixedHeight(50);
+    QFontMetrics fontMetrics(lpp->font());
+    int textWidth = fontMetrics.horizontalAdvance(showStr);
+    if (textWidth > 200) {
+        this->setFixedWidth(textWidth + 50);
+    } else {
+        this->setFixedWidth(200);
+    }
+}
+
+MessageTips::~MessageTips()
+{
+    if (mtimer != nullptr) {
+        delete mtimer;
+        mtimer = nullptr;
+    }
+}
+
+void MessageTips::prepare()
+{
+    this->setWindowOpacity(opacity);
+    connect(this, SIGNAL(finished()), this, SLOT(onFinished()));
+    mtimer = new QTimer(this);  // 隐藏的定时器
+    mtimer->setTimerType(Qt::PreciseTimer);
+    connect(mtimer, &QTimer::timeout, this, &MessageTips::opacityTimer);
+    this->move(this->parentWidget()->x() + (this->parentWidget()->width()) / 2 - this->width() / 2,
+               this->parentWidget()->y() + (this->parentWidget()->height()) / 2 - this->height() / 2);
+    QTimer::singleShot(showTime, this, [this] { mtimer->start(closeTime); });  // 执行延时自动关闭
+}
+
+void MessageTips::setCloseTimeSpeed(int time, double speed)
+{
+    if (speed > 0 && speed <= 1) {
+        closeSpeed = speed;
+    }
+    closeTime = time;
+}
+
+void MessageTips::paintEvent(QPaintEvent *event)
+{
+    QPainter painter(this);
+    painter.setBrush(QBrush(bgColor));  // 窗体的背景色
+    painter.setPen(QPen(frameColor, frameSize));  // 窗体边框的颜色和笔画大小
+    QRectF rect(0, 0, this->width(), this->height());
+    painter.drawRoundedRect(rect, 10, 10);
+    painter.setFont(lpp->font());
+    painter.setPen(QPen(textColor, frameSize));
+    painter.drawText(rect, Qt::AlignHCenter | Qt::AlignVCenter, showStr);
+}
+
+void MessageTips::opacityTimer()
+{
+    opacity = opacity - closeSpeed;
+    if (opacity <= 0) {
+        mtimer->stop();
+        this->close();
+        return;
+    } else {
+        this->setWindowOpacity(opacity);
+    }
+}
+
+void MessageTips::timerDelayShutdown()
+{
+    mtimer->start(closeTime);
+}
+
+void MessageTips::showMessageTips(QString str, QWidget *parent)
+{
+    MessageTips *mMessageTips = new MessageTips(str, parent);
+    mMessageTips->setShowTime(1500);
+    mMessageTips->prepare();
+    mMessageTips->show();
+}
+
+void MessageTips::setShowTime(int time)
+{
+    showTime = time;
+}
+
+void MessageTips::backgroundColor(QColor color)
+{
+    bgColor = color;
+}
+
+GuideDialog::GuideDialog(QWidget *parent)
+    : QDialog(parent)
+    , ui(new Ui::GuideDialog)
+{
+    ui->setupUi(this);
+    moveToCenter(this);
+    connect(ui->btnBrowse, &QPushButton::clicked, this, &GuideDialog::setRecvFileDirectory);
+    QString newPath=QStandardPaths::writableLocation(QStandardPaths::CacheLocation)+"/recvFile";
+    QDir dir(newPath);
+    if (!dir.exists()){
+        if(dir.mkpath(newPath)){
+            qDebug()<<"创建成功";
+        }else{
+            qDebug()<<"创建失败";
+        }
+    }else{
+        qDebug()<<"文件已存在";
+    }
+    ui->textDir->setText(newPath);
+    ui->textDir->setToolTip(ui->textDir->text());
+    this->setWindowTitle(tr("Setting Guide"));
+}
+
+GuideDialog::~GuideDialog()
+{
+    delete ui;
+}
+
+void GuideDialog::accept()
+{
+    if (this->getPassword().isEmpty()) {
+        return;
+    }
+    QString password = this->getPassword();
+    QString recvFilePath = this->getDirectory();
+    QSettings settings;
+    settings.setValue("password", password);
+    settings.setValue("cache_dir", recvFilePath);
+    QDialog::accept();
+}
+
+void GuideDialog::setRecvFileDirectory()
+{
+    const QString &path = QFileDialog::getExistingDirectory(this, tr("Select Cache Directory to Receive Files."));
+    if (path.isEmpty()) {
+        return;
+    }
+    ui->textDir->setText(path);
+}
+
+QString GuideDialog::getPassword()
+{
+    return ui->textPwd->text();
+}
+
+QString GuideDialog::getDirectory()
+{
+    return ui->textDir->text();
 }

@@ -8,6 +8,14 @@ project(lafdup)
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../lafrpc/cpp/lafrpc.h")
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../lafrpc/cpp/ lafrpc)
+cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
+
+if (POLICY CMP0071)
+  cmake_policy(SET CMP0071 NEW)
+endif ()
+
+project(lafdup)
+
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../lafrpc/cpp/lafrpc.h")
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../lafrpc/cpp/ lafrpc)
 else()

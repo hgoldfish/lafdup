@@ -6,6 +6,7 @@
 #include "lafdup_window.h"
 #include "lafdupapplication.h"
 #include "qtnetworkng.h"
+#include "lafdup_window_p.h"
 
 int main(int argc, char **argv)
 {
@@ -46,13 +47,22 @@ int main(int argc, char **argv)
     }
     sema.release();
 
-    QSettings settings;
-    LafdupWindow w;
-    if (!settings.value("password").toString().isEmpty()) {
-        if (!parser.isSet(minimizedOption)) {
-            w.showAndGetFocus();
+    QSettings *settings = new QSettings;
+    if (settings->value("password").toString().isEmpty()) {
+        GuideDialog guide;
+        guide.show();
+        int result = guide.exec();
+        if (result != QDialog::Accepted) {
+            return 0;
         }
     }
 
+    LafdupWindow w;
+    if (settings->value("isMinimized").toBool()) {
+        w.showMinimized();
+    } else {
+        w.showAndGetFocus();
+    }
+    delete settings;
     return qtng::startQtLoop();
 }

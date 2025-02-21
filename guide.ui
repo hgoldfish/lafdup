@@ -7,13 +7,13 @@
     <x>0</x>
     <y>0</y>
     <width>473</width>
-    <height>200</height>
+    <height>216</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout" stretch="2,1,2,1,2">
+  <layout class="QVBoxLayout" name="verticalLayout" stretch="2,1,2,1,0">
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <property name="spacing">

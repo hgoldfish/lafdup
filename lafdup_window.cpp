@@ -1,4 +1,4 @@
-#include "lafdup_window_p.h"
+﻿#include "lafdup_window_p.h"
 #include "lafdupapplication.h"
 #include "ui_configure.h"
 #include "ui_main.h"
@@ -209,13 +209,6 @@ LafdupWindow::LafdupWindow()
     started = peer->start();
     setAcceptDrops(true);
     ui->txtContent->setAcceptDrops(false);
-
-    guide = new GuideDialog(this);
-    connect(guide, &GuideDialog::accepted, this, &LafdupWindow::guideAction);
-    QSettings settings;
-    if (settings.value("password").toString().isEmpty()) {
-        guide->show();
-    }
 }
 
 LafdupWindow::~LafdupWindow()
@@ -398,7 +391,7 @@ void LafdupWindow::sendFileFailedTips(QString name, QString address)
 
 void LafdupWindow::sendFeedBackTips(QString tips)
 {
-    QString tipStr = tr("%1").arg(tips);
+    QString tipStr = tips;
     MessageTips::showMessageTips(tipStr, this);
 }
 
@@ -410,16 +403,6 @@ void LafdupWindow::sendAction()
 
 void LafdupWindow::guideAction()
 {
-    if (guide->getPassword().isEmpty()) {
-        guide->show();
-        return;
-    }
-    QString password = guide->getPassword();
-    QString recvFilePath = guide->getDirectory();
-    QSettings settings;
-    settings.setValue("password", password);
-    settings.setValue("cache_dir", recvFilePath);
-    showAndGetFocus();
 }
 
 void LafdupWindow::onClipboardChanged()
@@ -799,7 +782,9 @@ void ConfigureDialog::accept()
     settings.setValue("only_send_small_files", ui->chkOnlySendSmallFile->isChecked());
     settings.setValue("send_files_size", ui->spinSendFileSize->value());
     settings.setValue("ignore_password", ui->chkIgnorePassword->isChecked());
+    settings.setValue("isMinimized",ui->chkStartMin->isChecked());
     this->onChangelanguage();
+    appAutoRun(ui->chkAutoStart->isChecked());
     QDialog::accept();
 }
 
@@ -808,6 +793,7 @@ void ConfigureDialog::loadSettings()
     QSettings settings;
     const QStringList &knownPeers = settings.value("known_peers").toStringList();
     const QString &cacheDirPath = settings.value("cache_dir").toString();
+    const QString &password=settings.value("password").toString();
     bool deleteFiles = settings.value("delete_files", true).toBool();
     bool ok;
     int deleteFilesTime = settings.value("delete_files_time", 30).toInt(&ok);
@@ -824,6 +810,7 @@ void ConfigureDialog::loadSettings()
         sendFilesSize = 100.0;
     }
     bool ignorePassword = settings.value("ignore_password", false).toBool();
+    bool isMinmized=settings.value("isMinimized").toBool();
     peerModel->setPeers(knownPeers);
     ui->lstIPs->setModel(peerModel);
     ui->txtCacheDirectory->setText(cacheDirPath);
@@ -832,6 +819,8 @@ void ConfigureDialog::loadSettings()
     ui->chkSendFiles->setChecked(sendFiles);
     ui->chkOnlySendSmallFile->setChecked(onlySendSmallFiles);
     ui->spinSendFileSize->setValue(sendFilesSize);
+    ui->txtPassword->setText(password);
+    ui->chkStartMin->setChecked(isMinmized);
     if (!cacheDirPath.isEmpty()) {
         ui->chkDeleteFiles->setEnabled(true);
         ui->spinDeleteFilesTime->setEnabled(true);
@@ -845,6 +834,20 @@ void ConfigureDialog::loadSettings()
         ui->cbBLanguage->setCurrentIndex(1);
     } else {
         ui->cbBLanguage->setCurrentIndex(0);
+    }
+    QSettings autoRunSetting("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",QSettings::NativeFormat);
+    ui->chkAutoStart->setChecked(!autoRunSetting.value("GigaCores").isNull());
+}
+
+void ConfigureDialog::appAutoRun(bool checked)
+{
+    QString application_name = QString::fromUtf8("GigaCores");
+    QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",QSettings::NativeFormat);
+    if(checked){
+        QString application_path = QApplication::applicationFilePath();
+        settings.setValue(application_name, application_path.replace("/", "\\"));
+    }else{
+        settings.remove(application_name);
     }
 }
 
@@ -1054,6 +1057,19 @@ GuideDialog::GuideDialog(QWidget *parent)
 GuideDialog::~GuideDialog()
 {
     delete ui;
+}
+
+void GuideDialog::accept()
+{
+    if (this->getPassword().isEmpty()) {
+        return;
+    }
+    QString password = this->getPassword();
+    QString recvFilePath = this->getDirectory();
+    QSettings settings;
+    settings.setValue("password", password);
+    settings.setValue("cache_dir", recvFilePath);
+    QDialog::accept();
 }
 
 void GuideDialog::setRecvFileDirectory()

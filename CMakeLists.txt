@@ -52,8 +52,7 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
 endif()
 
-add_executable(lafdup WIN32 ${LAFDUP_SRC}
-)
+add_executable(lafdup WIN32 ${LAFDUP_SRC})
 target_link_libraries(lafdup Qt5::Widgets Qt5::Core lafrpc)
 
 #查找Qt翻译工具

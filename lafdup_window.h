@@ -60,7 +60,6 @@ private:
     QSystemTrayIcon *trayIcon;
     QMenu *trayMenu;
     bool started;
-    GuideDialog *guide;
 };
 
 #endif

@@ -1,4 +1,4 @@
-#ifndef LAFDUP_WINDOW_P_H
+﻿#ifndef LAFDUP_WINDOW_P_H
 #define LAFDUP_WINDOW_P_H
 
 #include <QtCore/qdatetime.h>
@@ -76,6 +76,7 @@ private slots:
     void onChangelanguage();
 private:
     void loadSettings();
+    void appAutoRun(bool checked);
 private:
     Ui::ConfigureDialog *ui;
     PeerModel *peerModel;
@@ -115,8 +116,9 @@ class GuideDialog : public QDialog
 {
     Q_OBJECT
 public:
-    GuideDialog(QWidget *parent);
+    GuideDialog(QWidget *parent=nullptr);
     ~GuideDialog();
+    virtual void accept() override;
 private slots:
     void setRecvFileDirectory();
 public:

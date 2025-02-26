@@ -97,8 +97,7 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
 
 QModelIndex CopyPasteModel::addCopyPaste(const CopyPaste &copyPaste)
 {
-    const auto &list = copyPasteList;
-    for (const CopyPaste &old : list) {
+    for (const CopyPaste &old : qAsConst(copyPasteList)) {
         if (old.direction == copyPaste.direction && old.timestamp == copyPaste.timestamp) {
             return QModelIndex();
         }
@@ -201,7 +200,6 @@ LafdupWindow::LafdupWindow()
 
     connect(peer.data(), &LafdupPeer::stateChanged, this, &LafdupWindow::onPeerStateChanged);
     connect(peer.data(), &LafdupPeer::incoming, this, &LafdupWindow::updateClipboard);
-    connect(peer.data(), &LafdupPeer::sendFileFailed, this, &LafdupWindow::sendFileFailedTips);
     connect(peer.data(), &LafdupPeer::sendFeedBack, this, &LafdupWindow::sendFeedBackTips);
     connect(peer.data(), &LafdupPeer::sendAction, this, &LafdupWindow::sendAction);
 
@@ -270,6 +268,7 @@ bool LafdupWindow::event(QEvent *e)
 {
     if (e->type() == QEvent::LanguageChange) {
         ui->retranslateUi(this);
+        updateMyIP();
     }
     return QWidget::event(e);
 }
@@ -382,13 +381,6 @@ void LafdupWindow::sendFiles()
     outgoing(fileUrls, true, true);
 }
 
-void LafdupWindow::sendFileFailedTips(QString name, QString address)
-{
-    QString tipStr =
-            tr("send  %1 to %2 failed \n The peer party may not set the path for receiving files").arg(name, address);
-    MessageTips::showMessageTips(tipStr, this);
-}
-
 void LafdupWindow::sendFeedBackTips(QString tips)
 {
     QString tipStr = tips;
@@ -399,10 +391,6 @@ void LafdupWindow::sendAction()
 {
     QString tipStr = "Start sending";
     MessageTips::showMessageTips(tipStr, this);
-}
-
-void LafdupWindow::guideAction()
-{
 }
 
 void LafdupWindow::onClipboardChanged()
@@ -756,7 +744,6 @@ ConfigureDialog::ConfigureDialog(QWidget *parent)
     connect(ui->chkDeleteFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onDeleteFilesChanged);
     connect(ui->chkSendFiles, &QCheckBox::stateChanged, this, &ConfigureDialog::onSendFilesChanged);
     connect(ui->chkOnlySendSmallFile, &QCheckBox::stateChanged, this, &ConfigureDialog::onOnlySendSmallFileChanged);
-    // connect(ui->btnChangeLanguage, &QPushButton::clicked, this, &ConfigureDialog::onChangelanguage);
 }
 
 ConfigureDialog::~ConfigureDialog()
@@ -782,7 +769,7 @@ void ConfigureDialog::accept()
     settings.setValue("only_send_small_files", ui->chkOnlySendSmallFile->isChecked());
     settings.setValue("send_files_size", ui->spinSendFileSize->value());
     settings.setValue("ignore_password", ui->chkIgnorePassword->isChecked());
-    settings.setValue("isMinimized",ui->chkStartMin->isChecked());
+    settings.setValue("isMinimized", ui->chkStartMin->isChecked());
     this->onChangelanguage();
     appAutoRun(ui->chkAutoStart->isChecked());
     QDialog::accept();
@@ -793,7 +780,7 @@ void ConfigureDialog::loadSettings()
     QSettings settings;
     const QStringList &knownPeers = settings.value("known_peers").toStringList();
     const QString &cacheDirPath = settings.value("cache_dir").toString();
-    const QString &password=settings.value("password").toString();
+    const QString &password = settings.value("password").toString();
     bool deleteFiles = settings.value("delete_files", true).toBool();
     bool ok;
     int deleteFilesTime = settings.value("delete_files_time", 30).toInt(&ok);
@@ -810,7 +797,7 @@ void ConfigureDialog::loadSettings()
         sendFilesSize = 100.0;
     }
     bool ignorePassword = settings.value("ignore_password", false).toBool();
-    bool isMinmized=settings.value("isMinimized").toBool();
+    bool isMinmized = settings.value("isMinimized").toBool();
     peerModel->setPeers(knownPeers);
     ui->lstIPs->setModel(peerModel);
     ui->txtCacheDirectory->setText(cacheDirPath);
@@ -835,18 +822,19 @@ void ConfigureDialog::loadSettings()
     } else {
         ui->cbBLanguage->setCurrentIndex(0);
     }
-    QSettings autoRunSetting("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",QSettings::NativeFormat);
-    ui->chkAutoStart->setChecked(!autoRunSetting.value("GigaCores").isNull());
+    QSettings autoRunSetting("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                             QSettings::NativeFormat);
+    ui->chkAutoStart->setChecked(!autoRunSetting.value("lafdup").isNull());
 }
 
 void ConfigureDialog::appAutoRun(bool checked)
 {
-    QString application_name = QString::fromUtf8("GigaCores");
-    QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",QSettings::NativeFormat);
-    if(checked){
+    QString application_name = QString::fromUtf8("lafdup");
+    QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
+    if (checked) {
         QString application_path = QApplication::applicationFilePath();
         settings.setValue(application_name, application_path.replace("/", "\\"));
-    }else{
+    } else {
         settings.remove(application_name);
     }
 }
@@ -867,7 +855,7 @@ void ConfigureDialog::onCacheDirectoryChanged(const QString &text)
 
 void ConfigureDialog::selectCacheDirectory()
 {
-    const QString &path = QFileDialog::getExistingDirectory(this, tr("Select Cache Directory to Receive Files."));
+    const QString &path = QFileDialog::getExistingDirectory(this, tr("Select Cache Directory to Receive Files."),ui->txtCacheDirectory->text());
     if (path.isEmpty()) {
         return;
     }
@@ -967,12 +955,11 @@ MessageTips::~MessageTips()
 void MessageTips::prepare()
 {
     this->setWindowOpacity(opacity);
-    connect(this, SIGNAL(finished()), this, SLOT(onFinished()));
     mtimer = new QTimer(this);  // 隐藏的定时器
     mtimer->setTimerType(Qt::PreciseTimer);
     connect(mtimer, &QTimer::timeout, this, &MessageTips::opacityTimer);
     this->move(this->parentWidget()->x() + (this->parentWidget()->width()) / 2 - this->width() / 2,
-               this->parentWidget()->y() + (this->parentWidget()->height()) / 2 - this->height() / 2);
+               10);
     QTimer::singleShot(showTime, this, [this] { mtimer->start(closeTime); });  // 执行延时自动关闭
 }
 
@@ -1038,16 +1025,16 @@ GuideDialog::GuideDialog(QWidget *parent)
     ui->setupUi(this);
     moveToCenter(this);
     connect(ui->btnBrowse, &QPushButton::clicked, this, &GuideDialog::setRecvFileDirectory);
-    QString newPath=QStandardPaths::writableLocation(QStandardPaths::CacheLocation)+"/recvFile";
+    QString newPath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/recvFile";
     QDir dir(newPath);
-    if (!dir.exists()){
-        if(dir.mkpath(newPath)){
-            qDebug()<<"创建成功";
-        }else{
-            qDebug()<<"创建失败";
+    if (!dir.exists()) {
+        if (dir.mkpath(newPath)) {
+            qDebug() << u8"创建成功";
+        } else {
+            qDebug() << u8"创建失败";
         }
-    }else{
-        qDebug()<<"文件已存在";
+    } else {
+        qDebug() << u8"文件已存在";
     }
     ui->textDir->setText(newPath);
     ui->textDir->setToolTip(ui->textDir->text());
@@ -1061,11 +1048,11 @@ GuideDialog::~GuideDialog()
 
 void GuideDialog::accept()
 {
-    if (this->getPassword().isEmpty()) {
+    if (ui->textPwd->text().isEmpty()) {
         return;
     }
-    QString password = this->getPassword();
-    QString recvFilePath = this->getDirectory();
+    QString password = ui->textPwd->text();
+    QString recvFilePath = ui->textDir->text();
     QSettings settings;
     settings.setValue("password", password);
     settings.setValue("cache_dir", recvFilePath);
@@ -1074,19 +1061,10 @@ void GuideDialog::accept()
 
 void GuideDialog::setRecvFileDirectory()
 {
-    const QString &path = QFileDialog::getExistingDirectory(this, tr("Select Cache Directory to Receive Files."));
+    const QString &path = QFileDialog::getExistingDirectory(this,tr("Select Cache Directory to Receive Files."),ui->textDir->text());
     if (path.isEmpty()) {
         return;
     }
     ui->textDir->setText(path);
 }
 
-QString GuideDialog::getPassword()
-{
-    return ui->textPwd->text();
-}
-
-QString GuideDialog::getDirectory()
-{
-    return ui->textDir->text();
-}

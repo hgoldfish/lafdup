@@ -105,7 +105,7 @@ private:
     QColor textColor = QColor(255, 255, 255);  // 字体颜色
     QColor bgColor = QColor(0, 191, 255);  // 窗体的背景色
     QColor frameColor = QColor(211, 211, 211);  // 边框颜色
-    int frameSize = 2;  // 边框粗细大小
+    int frameSize = 1;  // 边框粗细大小
     int showTime = 5000;  // 显示时间
     int closeTime = 100;  // 关闭需要时间
     double closeSpeed = 0.1;  // 窗体消失的平滑度，大小0~1
@@ -116,14 +116,11 @@ class GuideDialog : public QDialog
 {
     Q_OBJECT
 public:
-    GuideDialog(QWidget *parent=nullptr);
+    GuideDialog(QWidget *parent = nullptr);
     ~GuideDialog();
     virtual void accept() override;
-private slots:
+private:
     void setRecvFileDirectory();
-public:
-    QString getPassword();
-    QString getDirectory();
 private:
     Ui::GuideDialog *ui;
 };

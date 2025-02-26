@@ -1,4 +1,4 @@
-#ifndef LAFDUP_WINDOW_H
+﻿#ifndef LAFDUP_WINDOW_H
 #define LAFDUP_WINDOW_H
 #include <QtCore/qabstractitemmodel.h>
 #include <QtWidgets/qwidget.h>
@@ -42,10 +42,8 @@ private slots:
     void removeCopyPaste();
     void clearAll();
     void sendFiles();
-    void sendFileFailedTips(QString name, QString address);
     void sendFeedBackTips(QString tips);
     void sendAction();
-    void guideAction();
 private:
     bool outgoing(const QString &text, bool ignoreLimits);
     bool outgoing(const QList<QUrl> urls, bool showError, bool ignoreLimits);

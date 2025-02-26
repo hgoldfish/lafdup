@@ -1,4 +1,4 @@
-﻿#include <QtCore/qcommandlineparser.h>
+#include <QtCore/qcommandlineparser.h>
 #include <QtWidgets/qapplication.h>
 #include <QtWidgets/qstylefactory.h>
 #include <QtCore/qsystemsemaphore.h>
@@ -48,20 +48,20 @@ int main(int argc, char **argv)
     }
     sema.release();
 
-    QSettings *settings=new QSettings;
+    QSettings *settings = new QSettings;
     if (settings->value("password").toString().isEmpty()) {
         GuideDialog guide;
         guide.show();
-        int result=guide.exec();
-        if(result!=QDialog::Accepted){
+        int result = guide.exec();
+        if (result != QDialog::Accepted) {
             return 0;
         }
     }
 
     LafdupWindow w;
-    if(settings->value("isMinimized").toBool()){
+    if (settings->value("isMinimized").toBool()) {
         w.showMinimized();
-    }else{
+    } else {
         w.showAndGetFocus();
     }
     delete settings;

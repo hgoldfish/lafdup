@@ -8,8 +8,10 @@
         <file>images/configure.png</file>
         <file>images/ic_file_upload_black_48dp.png</file>
         <file>images/ic_file_download_black_48dp.png</file>
-        <file>images/bluefish.png</file>
         <file>translations/lafdup_zh_CN.qm</file>
         <file>images/language.png</file>
+        <file>images/bluefish.png</file>
+        <file>images/logo.ico</file>
+        <file>images/logo.rc</file>
     </qresource>
 </RCC>

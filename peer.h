@@ -1,4 +1,4 @@
-#ifndef LAFDUP_PEER_H
+﻿#ifndef LAFDUP_PEER_H
 #define LAFDUP_PEER_H
 
 #include <QtCore/qset.h>
@@ -30,7 +30,8 @@ public:
 signals:
     void incoming(const CopyPaste &copyPaste);
     void stateChanged(bool ok);
-    void sendFileFailed(QString name,QString address);
+    void sendFeedBack(QString str);
+    void sendAction();
 protected:
     bool hasPeer(const qtng::HostAddress &remoteHost, quint16 port);
     bool hasPeer(const QString &peerName);
@@ -46,6 +47,8 @@ private:
     void writeInformation(const QDir destDir);
     void cleanFiles();
     void _cleanFiles(const QDir &dir, bool cleanAll);
+    void sendContText(float  seconds, QList<QSharedPointer<lafrpc::Peer>> peers,const CopyPaste &copyPaste);
+    bool resultFeedBack(QSharedPointer<lafrpc::Peer> peer,QVariant result,QString errorText, const CopyPaste &copyPaste);
 private:
     QSharedPointer<LafdupDiscovery> discovery;
     QSharedPointer<LafdupRemoteStub> stub;

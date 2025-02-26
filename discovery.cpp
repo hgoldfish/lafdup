@@ -1,4 +1,4 @@
-#include <QtCore/qdatastream.h>
+﻿#include <QtCore/qdatastream.h>
 #include <QtCore/qloggingcategory.h>
 #include "discovery.h"
 #include "peer.h"

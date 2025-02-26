@@ -18,10 +18,8 @@ void LafdupApplication::translationLanguage()
         delete translationPtr;
         translationPtr = nullptr;
     }
-    QSettings settings("lafdup.ini", QSettings::IniFormat);
-    settings.beginGroup("Language");
-    QString languageSetting = settings.value("languageValue").toString();
-    settings.endGroup();
+    QSettings settings;
+    QString languageSetting = settings.value("language").toString();
     translationPtr = new QTranslator;
     languageStr = languageSetting;
     if (languageSetting == "Chinese_CN") {

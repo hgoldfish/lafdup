@@ -1,6 +1,3 @@
-#include "lafdup_window.h"
-#include "lafdupapplication.h"
-#include "qtnetworkng.h"
 #include <QtCore/qcommandlineparser.h>
 #include <QtWidgets/qapplication.h>
 #include <QtWidgets/qstylefactory.h>
@@ -9,6 +6,8 @@
 #include "lafdup_window.h"
 #include "lafdupapplication.h"
 #include "qtnetworkng.h"
+#include "lafdup_window_p.h"
+
 
 int main(int argc, char **argv)
 {
@@ -49,10 +48,22 @@ int main(int argc, char **argv)
     }
     sema.release();
 
-    lpp->translationLanguage();
+    QSettings *settings = new QSettings;
+    if (settings->value("password").toString().isEmpty()) {
+        GuideDialog guide;
+        guide.show();
+        int result = guide.exec();
+        if (result != QDialog::Accepted) {
+            return 0;
+        }
+    }
+
     LafdupWindow w;
-    if (!parser.isSet(minimizedOption)) {
+    if (settings->value("isMinimized").toBool()) {
+        w.showMinimized();
+    } else {
         w.showAndGetFocus();
     }
+    delete settings;
     return qtng::startQtLoop();
 }

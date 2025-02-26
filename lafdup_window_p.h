@@ -1,4 +1,4 @@
-#ifndef LAFDUP_WINDOW_P_H
+﻿#ifndef LAFDUP_WINDOW_P_H
 #define LAFDUP_WINDOW_P_H
 
 #include <QtCore/qdatetime.h>
@@ -9,6 +9,7 @@
 namespace Ui {
 class PasswordDialog;
 class ConfigureDialog;
+class GuideDialog;
 }  // namespace Ui
 
 class CopyPasteModel : public QAbstractListModel
@@ -75,10 +76,10 @@ private slots:
     void onChangelanguage();
 private:
     void loadSettings();
+    void appAutoRun(bool checked);
 private:
     Ui::ConfigureDialog *ui;
     PeerModel *peerModel;
-
 };
 
 class MessageTips : public QWidget
@@ -90,6 +91,7 @@ public:
     void prepare();
     void setCloseTimeSpeed(int closeTime = 100, double closeSpeed = 0.1);
     void setShowTime(int time);
+    void backgroundColor(QColor color);
     static void showMessageTips(QString str, QWidget *parent = nullptr);
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -103,10 +105,24 @@ private:
     QColor textColor = QColor(255, 255, 255);  // 字体颜色
     QColor bgColor = QColor(0, 191, 255);  // 窗体的背景色
     QColor frameColor = QColor(211, 211, 211);  // 边框颜色
-    int frameSize = 2;  // 边框粗细大小
+    int frameSize = 1;  // 边框粗细大小
     int showTime = 5000;  // 显示时间
     int closeTime = 100;  // 关闭需要时间
     double closeSpeed = 0.1;  // 窗体消失的平滑度，大小0~1
-    QTimer *mtimer=nullptr;
+    QTimer *mtimer = nullptr;
 };
+
+class GuideDialog : public QDialog
+{
+    Q_OBJECT
+public:
+    GuideDialog(QWidget *parent = nullptr);
+    ~GuideDialog();
+    virtual void accept() override;
+private:
+    void setRecvFileDirectory();
+private:
+    Ui::GuideDialog *ui;
+};
+
 #endif

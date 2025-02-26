@@ -42,7 +42,6 @@ private slots:
     void removeCopyPaste();
     void clearAll();
     void sendFiles();
-    void sendFileFailedTips(QString name, QString address);
     void sendFeedBackTips(QString tips);
     void sendAction();
 private:

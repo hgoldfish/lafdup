@@ -97,8 +97,7 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
 
 QModelIndex CopyPasteModel::addCopyPaste(const CopyPaste &copyPaste)
 {
-    const auto &list = copyPasteList;
-    for (const CopyPaste &old : list) {
+    for (const CopyPaste &old : qAsConst(copyPasteList)) {
         if (old.direction == copyPaste.direction && old.timestamp == copyPaste.timestamp) {
             return QModelIndex();
         }
@@ -201,7 +200,6 @@ LafdupWindow::LafdupWindow()
 
     connect(peer.data(), &LafdupPeer::stateChanged, this, &LafdupWindow::onPeerStateChanged);
     connect(peer.data(), &LafdupPeer::incoming, this, &LafdupWindow::updateClipboard);
-    connect(peer.data(), &LafdupPeer::sendFileFailed, this, &LafdupWindow::sendFileFailedTips);
     connect(peer.data(), &LafdupPeer::sendFeedBack, this, &LafdupWindow::sendFeedBackTips);
     connect(peer.data(), &LafdupPeer::sendAction, this, &LafdupWindow::sendAction);
 
@@ -270,6 +268,7 @@ bool LafdupWindow::event(QEvent *e)
 {
     if (e->type() == QEvent::LanguageChange) {
         ui->retranslateUi(this);
+        updateMyIP();
     }
     return QWidget::event(e);
 }
@@ -380,13 +379,6 @@ void LafdupWindow::sendFiles()
         return;
     }
     outgoing(fileUrls, true, true);
-}
-
-void LafdupWindow::sendFileFailedTips(QString name, QString address)
-{
-    QString tipStr =
-            tr("send  %1 to %2 failed \n The peer party may not set the path for receiving files").arg(name, address);
-    MessageTips::showMessageTips(tipStr, this);
 }
 
 void LafdupWindow::sendFeedBackTips(QString tips)
@@ -963,12 +955,11 @@ MessageTips::~MessageTips()
 void MessageTips::prepare()
 {
     this->setWindowOpacity(opacity);
-    connect(this, SIGNAL(finished()), this, SLOT(onFinished()));
     mtimer = new QTimer(this);  // 隐藏的定时器
     mtimer->setTimerType(Qt::PreciseTimer);
     connect(mtimer, &QTimer::timeout, this, &MessageTips::opacityTimer);
     this->move(this->parentWidget()->x() + (this->parentWidget()->width()) / 2 - this->width() / 2,
-               this->parentWidget()->y() + (this->parentWidget()->height()) / 2 - this->height() / 2);
+               10);
     QTimer::singleShot(showTime, this, [this] { mtimer->start(closeTime); });  // 执行延时自动关闭
 }
 

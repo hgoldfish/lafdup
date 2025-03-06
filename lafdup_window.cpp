@@ -52,7 +52,22 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
             }
             return fileNames.join(",");
         } else if (copyPaste.isImage()) {
-            return "Image";
+            return tr("Image");
+        } else if (copyPaste.isComp()) {
+            QString text;
+            if (!copyPaste.text.isEmpty()) {
+                text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
+            } else if (!copyPaste.image.isEmpty()) {
+                return tr("Image");
+            } else if (!copyPaste.files.isEmpty()) {
+                QStringList fileNames;
+                for (const QString &path : copyPaste.files) {
+                    QFileInfo fileInfo(path);
+                    fileNames.append(fileInfo.absoluteFilePath());
+                }
+                return fileNames.join("\n");
+            }
+            return text;
         }
     } else if (role == Qt::DecorationRole) {
         // TODO support dark theme.
@@ -60,7 +75,6 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
             return QIcon(":/images/ic_file_download_black_48dp.png").pixmap(QSize(32, 32));
         } else {
             return QIcon(":/images/ic_file_upload_black_48dp.png").pixmap(QSize(32, 32));
-            ;
         }
     } else if (role == Qt::ToolTipRole) {
         if (copyPaste.isText()) {
@@ -76,7 +90,22 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
             }
             return fileNames.join("\n");
         } else if (copyPaste.isImage()) {
-            return "Image";
+            return tr("Image");
+        } else if (copyPaste.isComp()) {
+            QString text;
+            if (!copyPaste.text.isEmpty()) {
+                text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
+            } else if (!copyPaste.image.isEmpty()) {
+                return tr("Image");
+            } else if (!copyPaste.files.isEmpty()) {
+                QStringList fileNames;
+                for (const QString &path : copyPaste.files) {
+                    QFileInfo fileInfo(path);
+                    fileNames.append(fileInfo.absoluteFilePath());
+                }
+                return fileNames.join("\n");
+            }
+            return text;
         }
     }
 
@@ -196,7 +225,7 @@ LafdupWindow::LafdupWindow()
     connect(ui->actionClearAll, SIGNAL(triggered(bool)), SLOT(clearAll()));
 
     QClipboard *clipboard = QApplication::clipboard();
-    connect(clipboard, SIGNAL(dataChanged()), SLOT(onClipboardChanged()));
+    connect(clipboard, &QClipboard::dataChanged, this, &LafdupWindow::onClipboardChanged);
 
     connect(peer.data(), &LafdupPeer::stateChanged, this, &LafdupWindow::onPeerStateChanged);
     connect(peer.data(), &LafdupPeer::incoming, this, &LafdupWindow::updateClipboard);
@@ -393,17 +422,43 @@ void LafdupWindow::sendAction()
     MessageTips::showMessageTips(tipStr, this);
 }
 
+bool LafdupWindow::outgoing(const CopyPaste &copyPaste)
+{
+    peer->outgoing(copyPaste);
+    return false;
+}
+
 void LafdupWindow::onClipboardChanged()
 {
+
     const QClipboard *clipboard = QApplication::clipboard();
     const QMimeData *mimeData = clipboard->mimeData();
-    if (mimeData->hasImage()) {
-        outgoing(mimeData->imageData().value<QImage>());
-    } else if (mimeData->hasUrls()) {
-        outgoing(mimeData->urls(), false, false);
-    } else if (mimeData->hasText()) {
+    if (!mimeData->hasImage() && !mimeData->hasUrls() && mimeData->hasText()) {
         outgoing(mimeData->text(), false);
+        return;
     }
+    if (mimeData->hasImage() && !mimeData->hasUrls() && !mimeData->hasText()) {
+        outgoing(mimeData->imageData().value<QImage>());
+        return;
+    }
+    if (!clipboard->mimeData()->hasImage() && clipboard->mimeData()->hasUrls() && !clipboard->mimeData()->hasText()) {
+        outgoing(mimeData->urls(), false, false);
+        return;
+    }
+    CopyPaste copyPaste;
+    copyPaste.timestamp = QDateTime::currentDateTime();
+    copyPaste.direction = CopyPaste::Outgoing;
+    copyPaste.mimeType = CompType;
+    copyPaste.ignoreLimits = false;
+    copyPaste.text = mimeData->text();
+    qDebug() << copyPaste.text;
+    copyPaste.image = saveImage(mimeData->imageData().value<QImage>());
+    QStringList filelist;
+    for (QUrl url : mimeData->urls()) {
+        filelist.append(url.toLocalFile());
+    }
+    copyPaste.files = filelist;
+    outgoing(copyPaste);
 }
 
 struct DisableSyncClipboard
@@ -418,7 +473,7 @@ DisableSyncClipboard::DisableSyncClipboard(QClipboard *clipboard, LafdupWindow *
     : clipboard(clipboard)
     , window(window)
 {
-    QObject::disconnect(clipboard, SIGNAL(dataChanged()), window, nullptr);
+    QObject::disconnect(clipboard, &QClipboard::dataChanged, window, &LafdupWindow::onClipboardChanged);
 }
 
 DisableSyncClipboard::~DisableSyncClipboard()
@@ -429,7 +484,8 @@ DisableSyncClipboard::~DisableSyncClipboard()
             return;
         }
         QClipboard *clipboard = QApplication::clipboard();
-        QObject::connect(clipboard, SIGNAL(dataChanged()), windowRef.data(), SLOT(onClipboardChanged()));
+
+        QObject::connect(clipboard, &QClipboard::dataChanged, windowRef.data(), &LafdupWindow::onClipboardChanged);
     });
 }
 
@@ -437,6 +493,23 @@ static bool updateClipboard(const CopyPaste &copyPaste, LafdupWindow *window)
 {
     QClipboard *clipboard = QApplication::clipboard();
     DisableSyncClipboard _(clipboard, window);
+    if (copyPaste.isComp()) {
+        if (!copyPaste.text.isEmpty()) {
+            clipboard->setText(copyPaste.text);
+        } else if (!copyPaste.image.isEmpty()) {
+            const QImage &image = loadImage(copyPaste.image);
+            clipboard->setImage(image);
+        } else if (!copyPaste.files.isEmpty()) {
+            QList<QUrl> urls;
+            for (const QString &file : copyPaste.files) {
+                urls.append(QUrl::fromLocalFile(file));
+            }
+            QMimeData *mimeData = new QMimeData();
+            mimeData->setUrls(urls);
+            clipboard->setMimeData(mimeData);
+        }
+        return true;
+    }
     if (copyPaste.isFile()) {
         QList<QUrl> urls;
         for (const QString &file : copyPaste.files) {

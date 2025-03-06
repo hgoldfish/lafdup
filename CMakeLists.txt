@@ -16,12 +16,6 @@ endif()
 
 cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
 
-if (POLICY CMP0071)
-  cmake_policy(SET CMP0071 NEW)
-endif ()
-
-project(lafdup)
-
 set(CMAKE_AUTOMOC ON)
 SET(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)

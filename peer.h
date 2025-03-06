@@ -43,16 +43,19 @@ private:
     QSharedPointer<lafrpc::Peer> handleRequestSync(QSharedPointer<qtng::SocketLike> request, qtng::DataChannelPole pole,
                                                    const QString &itsPeerName, const QString &itsAddress);
     void _outgoing(CopyPaste copyPaste);
+    bool canSendContent(const CopyPaste &copyPaste);
+
     bool findItem(const QDateTime &timestamp);
+    bool findItem(const CopyPaste &currentItem);
     void writeInformation(const QDir destDir);
     void cleanFiles();
     void _cleanFiles(const QDir &dir, bool cleanAll);
-    void sendContText(float  seconds, QList<QSharedPointer<lafrpc::Peer>> peers,const CopyPaste &copyPaste);
-    bool resultFeedBack(QSharedPointer<lafrpc::Peer> peer,QVariant result,QString errorText, const CopyPaste &copyPaste);
+    bool sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const CopyPaste &copyPaste, QString *errorString);
+    bool resultFeedBack(QSharedPointer<lafrpc::Peer> peer, QVariant result, QString errorText,
+                        const CopyPaste &copyPaste);
 private:
     QSharedPointer<LafdupDiscovery> discovery;
     QSharedPointer<LafdupRemoteStub> stub;
-    QSharedPointer<lafrpc::Rpc> rpc;
     QSharedPointer<qtng::Cipher> cipher;
     QList<CopyPaste> items;
     QSet<QString> connectingPeers;
@@ -65,6 +68,8 @@ private:
     friend LafdupRemoteStub;
     friend LafdupDiscovery;
     friend struct MarkCleaning;
+public:
+    QSharedPointer<lafrpc::Rpc> rpc;
 };
 
 #endif

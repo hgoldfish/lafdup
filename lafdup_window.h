@@ -35,7 +35,6 @@ private slots:
     void configure();
     void setPassword();
     void useOldContent(const QModelIndex &current);
-    void onClipboardChanged();
     void showContextMenu(const QPoint &pos);
     void copyToRemote();
     void setToClipboard();
@@ -44,7 +43,10 @@ private slots:
     void sendFiles();
     void sendFeedBackTips(QString tips);
     void sendAction();
+public slots:
+    void onClipboardChanged();
 private:
+    bool outgoing(const CopyPaste &copyPaste);
     bool outgoing(const QString &text, bool ignoreLimits);
     bool outgoing(const QList<QUrl> urls, bool showError, bool ignoreLimits);
     bool outgoing(const QImage &image);

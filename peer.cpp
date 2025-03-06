@@ -35,6 +35,102 @@ bool LafdupRemoteStub::pasteText(const QDateTime &timestamp, const QString &text
     return true;
 }
 
+bool LafdupRemoteStub::pasteCompText(const QDateTime &timestamp, const QString &text)
+{
+    if (!timestamp.isValid() || text.isEmpty()) {
+        throw RpcRemoteException(tr("The time is wrong or the content is empty"));
+    }
+    if (parent->findItem(timestamp)) {
+        throw RpcRemoteException(tr("The same content is sent repeatedly"));
+    }
+    PasteHashKey key(parent->rpc->getCurrentPeer()->name(), timestamp);
+    CopyPaste item;
+    item = pasteHash[key];
+    item.direction = CopyPaste::Incoming;
+    item.timestamp = timestamp;
+    item.mimeType = CompType;
+    item.text = text;
+    pasteHash[key] = item;
+    return true;
+}
+
+bool LafdupRemoteStub::pasteCompImage(const QDateTime &timestamp, QSharedPointer<lafrpc::RpcFile> image)
+{
+    if (!timestamp.isValid() || image.isNull() || image->name().isEmpty()) {
+        throw RpcRemoteException(tr("The local file to send could not be found"));
+    }
+    QByteArray imageData;
+    bool ok = image->recvall(imageData);
+    if (!ok) {
+        qDebug() << "can not receive image data.";
+        throw RpcRemoteException(tr("Failed to receive the picture"));
+    }
+    PasteHashKey key(parent->rpc->getCurrentPeer()->name(), timestamp);
+    CopyPaste item;
+    item = pasteHash[key];
+    item.direction = CopyPaste::Incoming;
+    item.timestamp = timestamp;
+    item.mimeType = CompType;
+    item.image = imageData;
+    pasteHash[key] = item;
+    return true;
+}
+
+bool LafdupRemoteStub::pasteCompFiles(const QDateTime &timestamp, QSharedPointer<lafrpc::RpcDir> rpcDir)
+{
+    if (rpcDir.isNull() || !rpcDir->isValid()) {
+        throw RpcRemoteException(tr("The local file to send could not be found"));
+    }
+    if (parent->cacheDir.isEmpty()) {
+        throw RpcRemoteException(tr("The storage path for the other party is empty"));
+    }
+    QDir cacheDir(parent->cacheDir);
+    if (!cacheDir.isReadable()) {
+        throw RpcRemoteException(tr("The storage path given by the other party is invalid"));
+    }
+    const QString &subdir = timestamp.toString("yyyyMMddHHmmss");
+    if (!cacheDir.mkdir(subdir)) {
+        throw RpcRemoteException(tr("Unable to create a folder on the other side to store files"));
+    }
+    QDir destDir(cacheDir.filePath(subdir));
+    bool ok = rpcDir->writeToPath(destDir.path());
+    if (!ok) {
+        throw RpcRemoteException(tr("Failed to save the file on the other party's computer"));
+    }
+    QStringList fullPaths;
+    for (const QString &filePath : static_cast<const QStringList>(
+                 destDir.entryList(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Files | QDir::Hidden))) {
+        fullPaths.append(destDir.absoluteFilePath(filePath));
+    }
+    parent->writeInformation(destDir);
+    PasteHashKey key(parent->rpc->getCurrentPeer()->name(), timestamp);
+    CopyPaste item = pasteHash[key];
+    item.direction = CopyPaste::Incoming;
+    item.timestamp = timestamp;
+    item.mimeType = CompType;
+    item.files = fullPaths;
+    pasteHash[key] = item;
+    return true;
+}
+
+bool LafdupRemoteStub::pasteEnd(const QDateTime &timeStamp)
+{
+    PasteHashKey key(parent->rpc->getCurrentPeer()->name(), timeStamp);
+    CopyPaste item = pasteHash[key];
+    if (!parent->findItem(item)) {
+        parent->items.prepend(item);
+    } else {
+        return false;
+    }
+    QPointer<LafdupPeer> parentRef(parent);
+    callInEventLoopAsync([parentRef, item] {
+        if (!parentRef.isNull()) {
+            emit parentRef->incoming(item);
+        }
+    });
+    return true;
+}
+
 bool LafdupRemoteStub::pasteFiles(const QDateTime &timestamp, QSharedPointer<RpcDir> rpcDir)
 {
     if (parent->findItem(timestamp) || rpcDir.isNull() || !rpcDir->isValid()) {
@@ -224,26 +320,103 @@ static bool isPassword(const QString &text)
 
 void LafdupPeer::_outgoing(CopyPaste copyPaste)
 {
-    float seconds = 20.0;
-    if (copyPaste.mimeType == BinaryType) {
-        if (copyPaste.ignoreLimits) {
-            seconds = 60.0 * 60 * 24;  // one day!
-        } else {
-            seconds = 60.0 * 60;  // one hour
+    if (!canSendContent(copyPaste)) {
+        return;
+    }
+    const QList<QString> peerList = rpc->getAllPeerNames();
+    QSet<QString> peerNames(peerList.begin(), peerList.end());
+    if (peerNames.isEmpty()) {
+        emit sendFeedBack(tr("Failed to send, no one accepted"));
+        return;
+    }
+    emit sendAction();
+
+    QList<QSharedPointer<Coroutine>> coroutines;
+    QList<QSharedPointer<QString>> errorStrings;
+    for (const QString &peerName : qAsConst(peerNames)) {
+        QSharedPointer<Peer> peer = rpc->get(peerName);
+        QSharedPointer<QString> errorString(new QString());
+        QSharedPointer<Coroutine> c = operations->spawn(
+                [this, peer, copyPaste, errorString] { sendContentToPeer(peer, copyPaste, errorString.data()); });
+        if (c) {
+            coroutines.append(c);
+            errorStrings.append(errorString);
         }
     }
-    if (rpc->getAllPeerNames().isEmpty()) {
-        emit sendFeedBack(tr("Failed to send, no one accepted"));
+    for (QSharedPointer<Coroutine> c : coroutines) {
+        c->join();
+    }
+    QStringList errors;
+    for (const QSharedPointer<QString> &errorString : qAsConst(errorStrings)) {
+        if (errorString->isEmpty()) {
+            continue;
+        }
+        errors.append(*errorString);
+    }
+    if (errors.isEmpty()) {
+        emit sendFeedBack(tr("Sent successfully"));
+        if (!findItem(copyPaste)) {
+            items.prepend(copyPaste);
+            qDebug() << "incoming";
+            emit incoming(copyPaste);
+        }
     } else {
-        emit sendAction();
+        emit sendFeedBack(errors.join("\n"));
     }
-    for (const QString &peerName : static_cast<const QStringList>(rpc->getAllPeerNames())) {
-        QList<QSharedPointer<Peer>> peers = rpc->getAll(peerName);
-        // prefer tcp peers.
-        std::sort(peers.begin(), peers.end(), lessThan);
+}
 
-        operations->spawn([this, seconds, peers, copyPaste] { sendContText(seconds, peers, copyPaste); });
+bool LafdupPeer::canSendContent(const CopyPaste &copyPaste)
+{
+    if (copyPaste.mimeType == TextType) {
+        if (!copyPaste.ignoreLimits && ignorePassword && isPassword(copyPaste.text)) {
+            return false;
+        }
+    } else if (copyPaste.mimeType == BinaryType) {
+        if (!copyPaste.ignoreLimits && qFuzzyIsNull(sendFilesSize)) {
+            return false;
+        }
+        QSharedPointer<VirtualRpcDirFileProvider> provider(new VirtualRpcDirFileProvider());
+        for (const QString &filePath : copyPaste.files) {
+            provider->addPath(filePath);
+        }
+
+        PopulateResult populateResult = provider->populate();
+        if (!copyPaste.ignoreLimits && populateResult.totalSize >= static_cast<quint64>(sendFilesSize * 1024 * 1024)) {
+            return false;
+        }
+    } else if (copyPaste.mimeType == ImageType) {
+        QByteArray imageData = copyPaste.image;
+        if (imageData.isEmpty()) {
+            return false;
+        }
+    } else if (copyPaste.mimeType == CompType) {
+        if (copyPaste.text.isEmpty() && copyPaste.image.isEmpty() && copyPaste.files.isEmpty()) {
+            return false;
+        }
+        if (!copyPaste.text.isEmpty()) {
+            if (!copyPaste.ignoreLimits && ignorePassword && isPassword(copyPaste.text)) {
+                return false;
+            }
+        }
+        if (!copyPaste.files.isEmpty()) {
+            if (!copyPaste.ignoreLimits && qFuzzyIsNull(sendFilesSize)) {
+                return false;
+            }
+            QSharedPointer<VirtualRpcDirFileProvider> provider(new VirtualRpcDirFileProvider());
+            for (const QString &filePath : copyPaste.files) {
+                provider->addPath(filePath);
+            }
+
+            PopulateResult populateResult = provider->populate();
+            if (!copyPaste.ignoreLimits
+                && populateResult.totalSize >= static_cast<quint64>(sendFilesSize * 1024 * 1024)) {
+                return false;
+            }
+        }
+    } else {
+        return false;
     }
+    return true;
 }
 
 void LafdupPeer::outgoing(const CopyPaste &copyPaste)
@@ -449,7 +622,18 @@ quint16 LafdupPeer::getDefaultPort()
 bool LafdupPeer::findItem(const QDateTime &timestamp)
 {
     for (const CopyPaste &item : qAsConst(items)) {
-        if (item.timestamp == timestamp) {
+        if (qAbs(item.timestamp.msecsTo(timestamp)) <= 50) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool LafdupPeer::findItem(const CopyPaste &currentItem)
+{
+    for (const CopyPaste &item : qAsConst(items)) {
+        if (item.text == currentItem.text && item.image == currentItem.image && item.files == currentItem.files
+            && qAbs(item.timestamp.msecsTo(currentItem.timestamp)) <= 50) {
             return true;
         }
     }
@@ -529,87 +713,132 @@ void LafdupPeer::_cleanFiles(const QDir &dir, bool cleanAll)
     }
 }
 
-void LafdupPeer::sendContText(float seconds, QList<QSharedPointer<lafrpc::Peer>> peers, const CopyPaste &copyPaste)
+bool LafdupPeer::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const CopyPaste &copyPaste, QString *errorString)
 {
+    float seconds = 20.0;
+    if (copyPaste.mimeType == BinaryType) {
+        if (copyPaste.ignoreLimits) {
+            seconds = 60.0 * 60 * 24;  // one day!
+        } else {
+            seconds = 60.0 * 60;  // one hour
+        }
+    }
     Timeout timeout(seconds);
     Q_UNUSED(timeout);
-    QVariant result;
-    QString errorText;
+    bool result = false;
     if (copyPaste.mimeType == TextType) {
-        if (!copyPaste.ignoreLimits && ignorePassword && isPassword(copyPaste.text)) {
-            return;
-        }
-        for (QSharedPointer<Peer> peer : peers) {
-            try {
-                result = peer->call("lafdup.pasteText", copyPaste.timestamp, copyPaste.text);
-            } catch (RpcException &e) {
-                qDebug() << e.what();
-                errorText = e.what();
-            }
-
-            if (resultFeedBack(peer, result, errorText, copyPaste)) {
-                break;
-            }
+        try {
+            result = peer->call("lafdup.pasteText", copyPaste.timestamp, copyPaste.text).toBool();
+        } catch (RpcException &e) {
+            *errorString = e.what();
+        } catch (TimeoutException &e) {
+            *errorString = e.what();
         }
     } else if (copyPaste.mimeType == BinaryType) {
-        if (!copyPaste.ignoreLimits && qFuzzyIsNull(sendFilesSize)) {
-            return;
-        }
         QSharedPointer<VirtualRpcDirFileProvider> provider(new VirtualRpcDirFileProvider());
         for (const QString &filePath : copyPaste.files) {
             provider->addPath(filePath);
         }
-
         PopulateResult populateResult = provider->populate();
-        if (!copyPaste.ignoreLimits && populateResult.totalSize >= static_cast<quint64>(sendFilesSize * 1024 * 1024)) {
-            return;
+        QSharedPointer<RpcDir> rpcDir(new RpcDir());
+        rpcDir->setName("paste");
+        rpcDir->setEntries(populateResult.entries);
+        rpcDir->setSize(populateResult.totalSize);
+        QSharedPointer<Coroutine> t = operations->spawn([rpcDir, provider] { rpcDir->readFrom(provider); });
+        try {
+            result = peer->call("lafdup.pasteFiles", copyPaste.timestamp, QVariant::fromValue(rpcDir)).toBool();
+        } catch (RpcException &e) {
+            *errorString = e.what();
+        } catch (TimeoutException &e) {
+            *errorString = e.what();
         }
-
-        for (QSharedPointer<Peer> peer : peers) {
+        t->kill();
+    } else if (copyPaste.mimeType == ImageType) {
+        QByteArray imageData = copyPaste.image;
+        QSharedPointer<RpcFile> rpcFile(new RpcFile());
+        rpcFile->setName("image.png");
+        rpcFile->setSize(static_cast<quint64>(imageData.size()));
+        QSharedPointer<Coroutine> t = operations->spawn([rpcFile, imageData] { rpcFile->sendall(imageData); });
+        try {
+            result = peer->call("lafdup.pasteImage", copyPaste.timestamp, QVariant::fromValue(rpcFile)).toBool();
+        } catch (RpcException &e) {
+            *errorString = e.what();
+            return result;
+        } catch (TimeoutException &e) {
+            *errorString = e.what();
+            return result;
+        }
+        t->kill();
+    } else if (copyPaste.mimeType == CompType) {
+        if (!copyPaste.text.isEmpty()) {
+            try {
+                result = peer->call("lafdup.pasteCompText", copyPaste.timestamp, copyPaste.text).toBool();
+            } catch (RpcException &e) {
+                *errorString = e.what();
+                return result;
+            } catch (TimeoutException &e) {
+                *errorString = e.what();
+                return result;
+            }
+        }
+        if (!copyPaste.image.isNull()) {
+            QByteArray imageData = copyPaste.image;
+            QSharedPointer<RpcFile> rpcFile(new RpcFile());
+            rpcFile->setName("image.png");
+            rpcFile->setSize(static_cast<quint64>(imageData.size()));
+            QSharedPointer<Coroutine> t1 = operations->spawn([rpcFile, imageData] { rpcFile->sendall(imageData); });
+            auto cleanup = qScopeGuard([&t1](){
+                if(t1){
+                    t1->kill();
+                }
+            });
+            try {
+                result = peer->call("lafdup.pasteCompImage", copyPaste.timestamp, QVariant::fromValue(rpcFile)).toBool();
+            } catch (RpcException &e) {
+                *errorString = e.what();
+                return result;
+            } catch (TimeoutException &e) {
+                *errorString = e.what();
+                return result;
+            }
+        }
+        if (!copyPaste.files.isEmpty()) {
+            QSharedPointer<VirtualRpcDirFileProvider> provider(new VirtualRpcDirFileProvider());
+            for (const QString &filePath : copyPaste.files) {
+                provider->addPath(filePath);
+            }
+            PopulateResult populateResult = provider->populate();
             QSharedPointer<RpcDir> rpcDir(new RpcDir());
             rpcDir->setName("paste");
             rpcDir->setEntries(populateResult.entries);
             rpcDir->setSize(populateResult.totalSize);
-            QSharedPointer<Coroutine> t = operations->spawn([rpcDir, provider] { rpcDir->readFrom(provider); });
+            QSharedPointer<Coroutine> t2 = operations->spawn([rpcDir, provider] { rpcDir->readFrom(provider); });
+            auto cleanup = qScopeGuard([&t2](){
+                if(t2){
+                    t2->kill();
+                }
+            });
             try {
-                result = peer->call("lafdup.pasteFiles", copyPaste.timestamp, QVariant::fromValue(rpcDir));
-                t->kill();
+                result = peer->call("lafdup.pasteCompFiles", copyPaste.timestamp, QVariant::fromValue(rpcDir)).toBool();
             } catch (RpcException &e) {
-                t->kill();
-                qDebug() << e.what();
-                errorText = e.what();
-            }
-
-            if (resultFeedBack(peer, result, errorText, copyPaste)) {
-                break;
+                *errorString = e.what();
+                return result;
+            } catch (TimeoutException &e) {
+                *errorString = e.what();
+                return result;
             }
         }
-    } else if (copyPaste.mimeType == ImageType) {
-        QByteArray imageData = copyPaste.image;
-        if (imageData.isEmpty()) {
-            return;
+        try {
+            result = peer->call("lafdup.pasteEnd", copyPaste.timestamp).toBool();
+        } catch (RpcException &e) {
+            *errorString = e.what();
+            return result;
+        } catch (TimeoutException &e) {
+            *errorString = e.what();
+            return result;
         }
-        for (QSharedPointer<Peer> peer : peers) {
-            QSharedPointer<RpcFile> rpcFile(new RpcFile());
-            rpcFile->setName("image.png");
-            rpcFile->setSize(static_cast<quint64>(imageData.size()));
-            QSharedPointer<Coroutine> t = operations->spawn([rpcFile, imageData] { rpcFile->sendall(imageData); });
-            try {
-                result = peer->call("lafdup.pasteImage", copyPaste.timestamp, QVariant::fromValue(rpcFile));
-                t->kill();
-            } catch (RpcException &e) {
-                t->kill();
-                qDebug() << e.what();
-                errorText = e.what();
-            }
-
-            if (resultFeedBack(peer, result, errorText, copyPaste)) {
-                break;
-            }
-        }
-    } else {
-        return;
     }
+    return result;
 }
 
 bool LafdupPeer::resultFeedBack(QSharedPointer<lafrpc::Peer> peer, QVariant result, QString errorText,

@@ -1,4 +1,4 @@
-#include <QtCore/qcommandlineparser.h>
+﻿#include <QtCore/qcommandlineparser.h>
 #include <QtWidgets/qapplication.h>
 #include <QtWidgets/qstylefactory.h>
 #include <QtCore/qsystemsemaphore.h>
@@ -11,6 +11,7 @@
 
 int main(int argc, char **argv)
 {
+    qSetMessagePattern("[%{time yyyyMMdd h:mm:ss.zzz}] - %{message}");
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
     QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
 

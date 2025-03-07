@@ -59,13 +59,14 @@ bool LafdupRemoteStub::pasteCompImage(const QDateTime &timestamp, QSharedPointer
     if (!timestamp.isValid() || image.isNull() || image->name().isEmpty()) {
         throw RpcRemoteException(tr("The local file to send could not be found"));
     }
+    QString name=parent->rpc->getCurrentPeer()->name();
     QByteArray imageData;
     bool ok = image->recvall(imageData);
     if (!ok) {
         qDebug() << "can not receive image data.";
         throw RpcRemoteException(tr("Failed to receive the picture"));
     }
-    PasteHashKey key(parent->rpc->getCurrentPeer()->name(), timestamp);
+    PasteHashKey key(name, timestamp);
     CopyPaste item;
     item = pasteHash[key];
     item.direction = CopyPaste::Incoming;
@@ -93,6 +94,7 @@ bool LafdupRemoteStub::pasteCompFiles(const QDateTime &timestamp, QSharedPointer
         throw RpcRemoteException(tr("Unable to create a folder on the other side to store files"));
     }
     QDir destDir(cacheDir.filePath(subdir));
+    QString name = parent->rpc->getCurrentPeer()->name();
     bool ok = rpcDir->writeToPath(destDir.path());
     if (!ok) {
         throw RpcRemoteException(tr("Failed to save the file on the other party's computer"));
@@ -103,7 +105,7 @@ bool LafdupRemoteStub::pasteCompFiles(const QDateTime &timestamp, QSharedPointer
         fullPaths.append(destDir.absoluteFilePath(filePath));
     }
     parent->writeInformation(destDir);
-    PasteHashKey key(parent->rpc->getCurrentPeer()->name(), timestamp);
+    PasteHashKey key(name, timestamp);
     CopyPaste item = pasteHash[key];
     item.direction = CopyPaste::Incoming;
     item.timestamp = timestamp;

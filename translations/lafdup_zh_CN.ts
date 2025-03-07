@@ -129,12 +129,12 @@
         <translation></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="931"/>
+        <location filename="../lafdup_window.cpp" line="934"/>
         <source>Select Cache Directory to Receive Files.</source>
         <translation>选择内存目录接收文件</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="964"/>
+        <location filename="../lafdup_window.cpp" line="967"/>
         <source>%1 is not a valid IP.</source>
         <translation>%1不是一个有效IP</translation>
     </message>
@@ -179,9 +179,9 @@
     </message>
     <message>
         <location filename="../lafdup_window.cpp" line="55"/>
-        <location filename="../lafdup_window.cpp" line="61"/>
+        <location filename="../lafdup_window.cpp" line="68"/>
         <location filename="../lafdup_window.cpp" line="93"/>
-        <location filename="../lafdup_window.cpp" line="99"/>
+        <location filename="../lafdup_window.cpp" line="109"/>
         <source>Image</source>
         <translation>图片</translation>
     </message>
@@ -189,12 +189,12 @@
 <context>
     <name>GuideDialog</name>
     <message>
-        <location filename="../lafdup_window.cpp" line="1114"/>
+        <location filename="../lafdup_window.cpp" line="1117"/>
         <source>Setting Guide</source>
         <translation>设置引导</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1137"/>
+        <location filename="../lafdup_window.cpp" line="1140"/>
         <source>Select Cache Directory to Receive Files.</source>
         <translation>选择内存目录接收文件.</translation>
     </message>
@@ -239,13 +239,13 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
 <context>
     <name>LafdupPeer</name>
     <message>
-        <location filename="../peer.cpp" line="329"/>
+        <location filename="../peer.cpp" line="331"/>
         <source>Failed to send, no one accepted</source>
         <translation>发送失败,没有节点接收</translation>
     </message>
     <message>
-        <location filename="../peer.cpp" line="357"/>
-        <location filename="../peer.cpp" line="855"/>
+        <location filename="../peer.cpp" line="359"/>
+        <location filename="../peer.cpp" line="857"/>
         <source>Sent successfully</source>
         <translation>发送成功</translation>
     </message>
@@ -261,45 +261,45 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
     <message>
         <location filename="../peer.cpp" line="21"/>
         <location filename="../peer.cpp" line="44"/>
-        <location filename="../peer.cpp" line="183"/>
+        <location filename="../peer.cpp" line="185"/>
         <source>The same content is sent repeatedly</source>
         <translation>内容重复发送</translation>
     </message>
     <message>
         <location filename="../peer.cpp" line="60"/>
-        <location filename="../peer.cpp" line="82"/>
-        <location filename="../peer.cpp" line="137"/>
-        <location filename="../peer.cpp" line="180"/>
+        <location filename="../peer.cpp" line="83"/>
+        <location filename="../peer.cpp" line="139"/>
+        <location filename="../peer.cpp" line="182"/>
         <source>The local file to send could not be found</source>
         <translation>找不到本地待发送的文件</translation>
     </message>
     <message>
-        <location filename="../peer.cpp" line="85"/>
-        <location filename="../peer.cpp" line="140"/>
+        <location filename="../peer.cpp" line="86"/>
+        <location filename="../peer.cpp" line="142"/>
         <source>The storage path for the other party is empty</source>
         <translation>对方存放文件路径为空</translation>
     </message>
     <message>
-        <location filename="../peer.cpp" line="89"/>
-        <location filename="../peer.cpp" line="144"/>
+        <location filename="../peer.cpp" line="90"/>
+        <location filename="../peer.cpp" line="146"/>
         <source>The storage path given by the other party is invalid</source>
         <translation>对方提供的存放路径无效</translation>
     </message>
     <message>
-        <location filename="../peer.cpp" line="93"/>
-        <location filename="../peer.cpp" line="148"/>
+        <location filename="../peer.cpp" line="94"/>
+        <location filename="../peer.cpp" line="150"/>
         <source>Unable to create a folder on the other side to store files</source>
         <translation>不能在对方的路径中创建一个文件去保存文件</translation>
     </message>
     <message>
-        <location filename="../peer.cpp" line="98"/>
-        <location filename="../peer.cpp" line="153"/>
+        <location filename="../peer.cpp" line="100"/>
+        <location filename="../peer.cpp" line="155"/>
         <source>Failed to save the file on the other party&apos;s computer</source>
         <translation>在对方电脑中保存文件失败</translation>
     </message>
     <message>
-        <location filename="../peer.cpp" line="66"/>
-        <location filename="../peer.cpp" line="189"/>
+        <location filename="../peer.cpp" line="67"/>
+        <location filename="../peer.cpp" line="191"/>
         <source>Failed to receive the picture</source>
         <translation>接收文件失败</translation>
     </message>
@@ -396,42 +396,42 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>删除选中项目</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="256"/>
+        <location filename="../lafdup_window.cpp" line="259"/>
         <source>Can not bind to port %1. Will not synchronize from other phone/pc.</source>
         <translation>无法绑定到端口%1。不会从其他手机或PC同步..</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="268"/>
+        <location filename="../lafdup_window.cpp" line="271"/>
         <source>Sync Clipboard is minimized to tray icon.</source>
         <translation>同步剪贴板被最小化到托盘图标。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="338"/>
+        <location filename="../lafdup_window.cpp" line="341"/>
         <source>can not send urls as files. this is a programming bug.</source>
         <translation>不能将url作为文件发送。这是一个编程错误.</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="342"/>
+        <location filename="../lafdup_window.cpp" line="345"/>
         <source>can not send files. some file is moved.</source>
         <translation>不能发送文件，某些文件被移动。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="395"/>
+        <location filename="../lafdup_window.cpp" line="398"/>
         <source>Can not send empty content.</source>
         <translation>发送内容不能为空。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="406"/>
+        <location filename="../lafdup_window.cpp" line="409"/>
         <source>select files to send.</source>
         <translation>选择文件发送。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="421"/>
+        <location filename="../lafdup_window.cpp" line="424"/>
         <source>Start sending</source>
         <translation>开始发送</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="629"/>
+        <location filename="../lafdup_window.cpp" line="632"/>
         <source>My IP Addresses:</source>
         <translation>我的IP地址：</translation>
     </message>
@@ -449,7 +449,7 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>同步剪贴板使用AES/SHA256来保护计算机之间的数据传输。所有的个人电脑和手机都使用相同的密码。注意：此密码以明文形式存储在Windows注册表中。不要对关键数据使用相同的密码。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="745"/>
+        <location filename="../lafdup_window.cpp" line="748"/>
         <source>Password is empty.</source>
         <translation>密码为空。</translation>
     </message>

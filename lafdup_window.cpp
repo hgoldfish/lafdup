@@ -55,17 +55,17 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
             return tr("Image");
         } else if (copyPaste.isComp()) {
             QString text;
-            if (!copyPaste.text.isEmpty()) {
-                text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
-            } else if (!copyPaste.image.isEmpty()) {
-                return tr("Image");
-            } else if (!copyPaste.files.isEmpty()) {
+            if(!copyPaste.files.isEmpty()){
                 QStringList fileNames;
                 for (const QString &path : copyPaste.files) {
                     QFileInfo fileInfo(path);
-                    fileNames.append(fileInfo.absoluteFilePath());
+                    fileNames.append(fileInfo.fileName());
                 }
                 return fileNames.join("\n");
+            }else if (!copyPaste.text.isEmpty()) {
+                text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
+            } else if (!copyPaste.image.isEmpty()) {
+                return tr("Image");
             }
             return text;
         }
@@ -93,17 +93,20 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
             return tr("Image");
         } else if (copyPaste.isComp()) {
             QString text;
-            if (!copyPaste.text.isEmpty()) {
-                text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
-            } else if (!copyPaste.image.isEmpty()) {
-                return tr("Image");
-            } else if (!copyPaste.files.isEmpty()) {
+            if(!copyPaste.files.isEmpty()){
+                qDebug()<<"file";
                 QStringList fileNames;
                 for (const QString &path : copyPaste.files) {
                     QFileInfo fileInfo(path);
                     fileNames.append(fileInfo.absoluteFilePath());
                 }
                 return fileNames.join("\n");
+            }else if (!copyPaste.text.isEmpty()) {
+                qDebug()<<"text";
+                text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
+            } else if (!copyPaste.image.isEmpty()) {
+                qDebug()<<"image";
+                return tr("Image");
             }
             return text;
         }

@@ -1,9 +1,10 @@
-#include <QtCore/qdatastream.h>
+﻿#include <QtCore/qdatastream.h>
 #include <QtCore/qloggingcategory.h>
 #include "discovery.h"
 #include "peer.h"
 
-static Q_LOGGING_CATEGORY(logger, "lafdup.discovery") using namespace qtng;
+static Q_LOGGING_CATEGORY(logger, "lafdup.discovery");
+using namespace qtng;
 const quint16 DefaultPort = 7951;
 const quint16 MagicNumber = DefaultPort;
 const quint8 CurrentVersion = 1;

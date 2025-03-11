@@ -129,31 +129,6 @@
         <translation></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="830"/>
-        <source>Select Cache Directory to Receive Files.</source>
-        <translation>选择内存目录接收文件</translation>
-    </message>
-    <message>
-        <location filename="../lafdup_window.cpp" line="862"/>
-        <source>%1 is not a valid IP.</source>
-        <translation>%1不是一个有效IP</translation>
-    </message>
-    <message>
-        <location filename="../lafdup_window.cpp" line="888"/>
-        <source>changeLanguage</source>
-        <translation>修改语言</translation>
-    </message>
-    <message>
-        <location filename="../lafdup_window.cpp" line="888"/>
-        <source>Whether or not to change the language used by the program</source>
-        <translation>是否确定修改本程序的默认语言</translation>
-    </message>
-    <message>
-        <location filename="../configure.ui"/>
-        <source>Language</source>
-        <translation>语言</translation>
-    </message>
-    <message>
         <location filename="../configure.ui"/>
         <source>Check Language：</source>
         <translation>选择语言:</translation>
@@ -170,17 +145,163 @@
     </message>
     <message>
         <location filename="../configure.ui"/>
-        <source>change</source>
-        <translation>修改</translation>
+        <source>General</source>
+        <translation>通用</translation>
+    </message>
+    <message>
+        <location filename="../configure.ui"/>
+        <source>Whether to set the software to start automatically on startup</source>
+        <translation>是否设置为开机自启动</translation>
+    </message>
+    <message>
+        <location filename="../configure.ui"/>
+        <source>Post-start minimization</source>
+        <translation>启动时最小化</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="939"/>
+        <source>Select Cache Directory to Receive Files.</source>
+        <translation>选择一个文件夹接收文件</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="972"/>
+        <source>%1 is not a valid IP.</source>
+        <translation>%1 是一个无效IP</translation>
     </message>
 </context>
 <context>
     <name>CopyPasteModel</name>
     <message>
-        <location filename="../lafdup_window.cpp" line="43"/>
-        <location filename="../lafdup_window.cpp" line="67"/>
+        <location filename="../lafdup_window.cpp" line="45"/>
+        <location filename="../lafdup_window.cpp" line="83"/>
         <source>&lt;Spaces&gt;</source>
         <translation>&lt;空格&gt;</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="55"/>
+        <location filename="../lafdup_window.cpp" line="68"/>
+        <location filename="../lafdup_window.cpp" line="93"/>
+        <location filename="../lafdup_window.cpp" line="109"/>
+        <source>Image</source>
+        <translation>图片</translation>
+    </message>
+</context>
+<context>
+    <name>GuideDialog</name>
+    <message>
+        <location filename="../guide.ui"/>
+        <source>Dialog</source>
+        <translation>初始化引导</translation>
+    </message>
+    <message>
+        <location filename="../guide.ui"/>
+        <source>Password:</source>
+        <translation>密码:</translation>
+    </message>
+    <message>
+        <location filename="../guide.ui"/>
+        <source>Cannot be null</source>
+        <translation>不能为空</translation>
+    </message>
+    <message>
+        <location filename="../guide.ui"/>
+        <source>You need to set a password to ensure the security of data transmissionel
+Sending and receiving can only be achieved if the sender and receiver use the same password</source>
+        <translation>你需要设置一个密码来保障传输的数据安全
+只有当发送方和接收方使用同一个的密码时，双方才能通信</translation>
+    </message>
+    <message>
+        <location filename="../guide.ui"/>
+        <source>Directory:</source>
+        <translation>目录:</translation>
+    </message>
+    <message>
+        <location filename="../guide.ui"/>
+        <source>Browse</source>
+        <translation>选择目录</translation>
+    </message>
+    <message>
+        <location filename="../guide.ui"/>
+        <source>Choose a directory to store files sent by other nodes</source>
+        <translation>选择一个目录接收其他节点发送的文件</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="1122"/>
+        <source>Setting Guide</source>
+        <translation>设置引导</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="1145"/>
+        <source>Select Cache Directory to Receive Files.</source>
+        <translation>选择一个文件夹接收文件</translation>
+    </message>
+</context>
+<context>
+    <name>LafdupPeer</name>
+    <message>
+        <location filename="../peer.cpp" line="331"/>
+        <source>Failed to send, no one accepted</source>
+        <translation>发送失败,没有节点接收</translation>
+    </message>
+    <message>
+        <location filename="../peer.cpp" line="359"/>
+        <location filename="../peer.cpp" line="858"/>
+        <source>Sent successfully</source>
+        <translation>发送成功</translation>
+    </message>
+</context>
+<context>
+    <name>LafdupRemoteStub</name>
+    <message>
+        <location filename="../peer.cpp" line="18"/>
+        <location filename="../peer.cpp" line="41"/>
+        <source>The time is wrong or the content is empty</source>
+        <translation>时间有误或发送内容为空</translation>
+    </message>
+    <message>
+        <location filename="../peer.cpp" line="21"/>
+        <location filename="../peer.cpp" line="44"/>
+        <location filename="../peer.cpp" line="185"/>
+        <source>The same content is sent repeatedly</source>
+        <translation>内容重复发送</translation>
+    </message>
+    <message>
+        <location filename="../peer.cpp" line="60"/>
+        <location filename="../peer.cpp" line="83"/>
+        <location filename="../peer.cpp" line="139"/>
+        <location filename="../peer.cpp" line="182"/>
+        <source>The local file to send could not be found</source>
+        <translation>找不到本地待发送的文件</translation>
+    </message>
+    <message>
+        <location filename="../peer.cpp" line="86"/>
+        <location filename="../peer.cpp" line="142"/>
+        <source>The storage path for the other party is empty</source>
+        <translation>对方存放文件路径为空</translation>
+    </message>
+    <message>
+        <location filename="../peer.cpp" line="90"/>
+        <location filename="../peer.cpp" line="146"/>
+        <source>The storage path given by the other party is invalid</source>
+        <translation>对方提供的存放路径无效</translation>
+    </message>
+    <message>
+        <location filename="../peer.cpp" line="94"/>
+        <location filename="../peer.cpp" line="150"/>
+        <source>Unable to create a folder on the other side to store files</source>
+        <translation>不能在对方的路径中创建一个文件去保存文件</translation>
+    </message>
+    <message>
+        <location filename="../peer.cpp" line="100"/>
+        <location filename="../peer.cpp" line="155"/>
+        <source>Failed to save the file on the other party&apos;s computer</source>
+        <translation>在对方电脑中保存文件失败</translation>
+    </message>
+    <message>
+        <location filename="../peer.cpp" line="67"/>
+        <location filename="../peer.cpp" line="191"/>
+        <source>Failed to receive the picture</source>
+        <translation>接收文件失败</translation>
     </message>
 </context>
 <context>
@@ -275,46 +396,44 @@
         <translation>删除选中项目</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="225"/>
+        <location filename="../lafdup_window.cpp" line="259"/>
         <source>Can not bind to port %1. Will not synchronize from other phone/pc.</source>
         <translation>无法绑定到端口%1。不会从其他手机或PC同步..</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="237"/>
+        <location filename="../lafdup_window.cpp" line="271"/>
         <source>Sync Clipboard is minimized to tray icon.</source>
         <translation>同步剪贴板被最小化到托盘图标。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="306"/>
+        <location filename="../lafdup_window.cpp" line="347"/>
         <source>can not send urls as files. this is a programming bug.</source>
         <translation>不能将url作为文件发送。这是一个编程错误.</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="310"/>
+        <location filename="../lafdup_window.cpp" line="351"/>
         <source>can not send files. some file is moved.</source>
         <translation>不能发送文件，某些文件被移动。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="363"/>
+        <location filename="../lafdup_window.cpp" line="404"/>
         <source>Can not send empty content.</source>
         <translation>发送内容不能为空。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="374"/>
+        <location filename="../lafdup_window.cpp" line="415"/>
         <source>select files to send.</source>
         <translation>选择文件发送。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="384"/>
-        <source>send  %1 to %2 failed 
- The peer party may not set the path for receiving files</source>
-        <translation>发送 %1 给 %2 失败了
-对方可能没有设置接收文件的路径</translation>
+        <location filename="../lafdup_window.cpp" line="431"/>
+        <source>Start sending</source>
+        <translation>开始发送</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="548"/>
+        <location filename="../lafdup_window.cpp" line="637"/>
         <source>My IP Addresses:</source>
-        <translation>我的IP地址：</translation>
+        <translation>本机IP：</translation>
     </message>
 </context>
 <context>
@@ -330,25 +449,25 @@
         <translation>同步剪贴板使用AES/SHA256来保护计算机之间的数据传输。所有的个人电脑和手机都使用相同的密码。注意：此密码以明文形式存储在Windows注册表中。不要对关键数据使用相同的密码。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="664"/>
-        <source>Password is empty.</source>
-        <translation>密码为空。</translation>
-    </message>
-    <message>
         <location filename="../password.ui"/>
         <source>Password for sending content</source>
         <translation>发送内容密码</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="753"/>
+        <source>Password is empty.</source>
+        <translation>密码为空</translation>
     </message>
 </context>
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../main.cpp" line="42"/>
+        <location filename="../main.cpp" line="45"/>
         <source>tips</source>
         <translation>提示</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="43"/>
+        <location filename="../main.cpp" line="46"/>
         <source>The program is running, please exit first if necessary</source>
         <translation>已有程序在运行，如有需要请先退出</translation>
     </message>

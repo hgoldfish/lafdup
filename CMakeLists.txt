@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
+﻿cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
 
 if (POLICY CMP0071)
   cmake_policy(SET CMP0071 NEW)
@@ -13,6 +13,8 @@ elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../lafrpc/cpp/lafrpc.h")
 else()
     add_subdirectory(lafrpc/cpp lafrpc)
 endif()
+
+cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
 
 set(CMAKE_AUTOMOC ON)
 SET(CMAKE_AUTOUIC ON)
@@ -30,6 +32,7 @@ set(LAFDUP_SRC
     lafdupapplication.h
     lafdupapplication.cpp
     lafdup.qrc
+    images/logo.rc
 
     peer.h
     peer_p.h
@@ -43,6 +46,7 @@ set(LAFDUP_SRC
     main.ui
     password.ui
     configure.ui
+    guide.ui
 )
 
 add_definitions(-DQT_NO_CAST_TO_ASCII)
@@ -50,22 +54,27 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
 endif()
 
-add_executable(lafdup WIN32 ${LAFDUP_SRC}
-    lafdupapplication.h lafdupapplication.cpp
-    )
+add_executable(lafdup WIN32 ${LAFDUP_SRC})
 target_link_libraries(lafdup Qt5::Widgets Qt5::Core lafrpc)
 
+#查找Qt翻译工具
 find_package(Qt5 REQUIRED COMPONENTS LinguistTools REQUIRED)
 
+# 初始化要使用的列表
 set(TS_FILES
     translations/lafdup_zh_CN.ts
 )
 set(QM_FILES)
 
+# 设置翻译文件的生成路径，如果不指定就会生成在CMakeFiles的目录里
 set_source_files_properties(${TS_FILES}
     PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/translations
 )
+# 创建翻译的最关键一步
 qt5_create_translation(QM_FILES ${TS_FILES} ${LAFDUP_SRC} OPTIONS -no-obsolete -no-ui-lines)
 
+# 添加更新翻译的目标
 add_custom_target(lupdate_task DEPENDS ${TS_FILES})
 add_custom_target(lrelease_task DEPENDS ${QM_FILES})
+
+

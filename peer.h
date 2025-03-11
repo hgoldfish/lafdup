@@ -1,4 +1,4 @@
-#ifndef LAFDUP_PEER_H
+﻿#ifndef LAFDUP_PEER_H
 #define LAFDUP_PEER_H
 
 #include <QtCore/qset.h>
@@ -30,7 +30,8 @@ public:
 signals:
     void incoming(const CopyPaste &copyPaste);
     void stateChanged(bool ok);
-    void sendFileFailed(QString name,QString address);
+    void sendFeedBack(QString str);
+    void sendAction();
 protected:
     bool hasPeer(const qtng::HostAddress &remoteHost, quint16 port);
     bool hasPeer(const QString &peerName);
@@ -42,14 +43,19 @@ private:
     QSharedPointer<lafrpc::Peer> handleRequestSync(QSharedPointer<qtng::SocketLike> request, qtng::DataChannelPole pole,
                                                    const QString &itsPeerName, const QString &itsAddress);
     void _outgoing(CopyPaste copyPaste);
+    bool canSendContent(const CopyPaste &copyPaste);
+
     bool findItem(const QDateTime &timestamp);
+    bool findItem(const CopyPaste &currentItem);
     void writeInformation(const QDir destDir);
     void cleanFiles();
     void _cleanFiles(const QDir &dir, bool cleanAll);
+    bool sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const CopyPaste &copyPaste, QString *errorString);
+    bool resultFeedBack(QSharedPointer<lafrpc::Peer> peer, QVariant result, QString errorText,
+                        const CopyPaste &copyPaste);
 private:
     QSharedPointer<LafdupDiscovery> discovery;
     QSharedPointer<LafdupRemoteStub> stub;
-    QSharedPointer<lafrpc::Rpc> rpc;
     QSharedPointer<qtng::Cipher> cipher;
     QList<CopyPaste> items;
     QSet<QString> connectingPeers;
@@ -62,6 +68,8 @@ private:
     friend LafdupRemoteStub;
     friend LafdupDiscovery;
     friend struct MarkCleaning;
+public:
+    QSharedPointer<lafrpc::Rpc> rpc;
 };
 
 #endif

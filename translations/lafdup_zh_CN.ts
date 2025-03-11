@@ -129,16 +129,6 @@
         <translation></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="934"/>
-        <source>Select Cache Directory to Receive Files.</source>
-        <translation>选择内存目录接收文件</translation>
-    </message>
-    <message>
-        <location filename="../lafdup_window.cpp" line="967"/>
-        <source>%1 is not a valid IP.</source>
-        <translation>%1不是一个有效IP</translation>
-    </message>
-    <message>
         <location filename="../configure.ui"/>
         <source>Check Language：</source>
         <translation>选择语言:</translation>
@@ -168,6 +158,16 @@
         <source>Post-start minimization</source>
         <translation>启动时最小化</translation>
     </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="953"/>
+        <source>Select Cache Directory to Receive Files.</source>
+        <translation>选择一个文件夹接收文件</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="986"/>
+        <source>%1 is not a valid IP.</source>
+        <translation>%1 是一个无效IP</translation>
+    </message>
 </context>
 <context>
     <name>CopyPasteModel</name>
@@ -188,16 +188,6 @@
 </context>
 <context>
     <name>GuideDialog</name>
-    <message>
-        <location filename="../lafdup_window.cpp" line="1117"/>
-        <source>Setting Guide</source>
-        <translation>设置引导</translation>
-    </message>
-    <message>
-        <location filename="../lafdup_window.cpp" line="1140"/>
-        <source>Select Cache Directory to Receive Files.</source>
-        <translation>选择内存目录接收文件.</translation>
-    </message>
     <message>
         <location filename="../guide.ui"/>
         <source>Dialog</source>
@@ -235,6 +225,16 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <source>Choose a directory to store files sent by other nodes</source>
         <translation>选择一个目录接收其他节点发送的文件</translation>
     </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="1136"/>
+        <source>Setting Guide</source>
+        <translation>设置引导</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="1159"/>
+        <source>Select Cache Directory to Receive Files.</source>
+        <translation>选择一个文件夹接收文件</translation>
+    </message>
 </context>
 <context>
     <name>LafdupPeer</name>
@@ -244,7 +244,7 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>发送失败,没有节点接收</translation>
     </message>
     <message>
-        <location filename="../peer.cpp" line="359"/>
+        <location filename="../peer.cpp" line="358"/>
         <location filename="../peer.cpp" line="857"/>
         <source>Sent successfully</source>
         <translation>发送成功</translation>
@@ -406,34 +406,34 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>同步剪贴板被最小化到托盘图标。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="341"/>
+        <location filename="../lafdup_window.cpp" line="347"/>
         <source>can not send urls as files. this is a programming bug.</source>
         <translation>不能将url作为文件发送。这是一个编程错误.</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="345"/>
+        <location filename="../lafdup_window.cpp" line="351"/>
         <source>can not send files. some file is moved.</source>
         <translation>不能发送文件，某些文件被移动。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="398"/>
+        <location filename="../lafdup_window.cpp" line="416"/>
         <source>Can not send empty content.</source>
         <translation>发送内容不能为空。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="409"/>
+        <location filename="../lafdup_window.cpp" line="427"/>
         <source>select files to send.</source>
         <translation>选择文件发送。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="424"/>
+        <location filename="../lafdup_window.cpp" line="443"/>
         <source>Start sending</source>
         <translation>开始发送</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="632"/>
+        <location filename="../lafdup_window.cpp" line="651"/>
         <source>My IP Addresses:</source>
-        <translation>我的IP地址：</translation>
+        <translation>本机IP：</translation>
     </message>
 </context>
 <context>
@@ -449,14 +449,14 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>同步剪贴板使用AES/SHA256来保护计算机之间的数据传输。所有的个人电脑和手机都使用相同的密码。注意：此密码以明文形式存储在Windows注册表中。不要对关键数据使用相同的密码。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="748"/>
-        <source>Password is empty.</source>
-        <translation>密码为空。</translation>
-    </message>
-    <message>
         <location filename="../password.ui"/>
         <source>Password for sending content</source>
         <translation>发送内容密码</translation>
+    </message>
+    <message>
+        <location filename="../lafdup_window.cpp" line="767"/>
+        <source>Password is empty.</source>
+        <translation>密码为空</translation>
     </message>
 </context>
 <context>

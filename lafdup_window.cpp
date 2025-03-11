@@ -55,14 +55,14 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
             return tr("Image");
         } else if (copyPaste.isComp()) {
             QString text;
-            if(!copyPaste.files.isEmpty()){
+            if (!copyPaste.files.isEmpty()) {
                 QStringList fileNames;
                 for (const QString &path : copyPaste.files) {
                     QFileInfo fileInfo(path);
                     fileNames.append(fileInfo.fileName());
                 }
                 return fileNames.join("\n");
-            }else if (!copyPaste.text.isEmpty()) {
+            } else if (!copyPaste.text.isEmpty()) {
                 text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
             } else if (!copyPaste.image.isEmpty()) {
                 return tr("Image");
@@ -93,19 +93,19 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
             return tr("Image");
         } else if (copyPaste.isComp()) {
             QString text;
-            if(!copyPaste.files.isEmpty()){
-                qDebug()<<"file";
+            if (!copyPaste.files.isEmpty()) {
+                qDebug() << "file";
                 QStringList fileNames;
                 for (const QString &path : copyPaste.files) {
                     QFileInfo fileInfo(path);
                     fileNames.append(fileInfo.absoluteFilePath());
                 }
                 return fileNames.join("\n");
-            }else if (!copyPaste.text.isEmpty()) {
-                qDebug()<<"text";
+            } else if (!copyPaste.text.isEmpty()) {
+                qDebug() << "text";
                 text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
             } else if (!copyPaste.image.isEmpty()) {
-                qDebug()<<"image";
+                qDebug() << "image";
                 return tr("Image");
             }
             return text;
@@ -330,12 +330,18 @@ bool LafdupWindow::outgoing(const QList<QUrl> urls, bool showError, bool ignoreL
         if (!url.isLocalFile()) {
             notLocal = true;
             break;
+        } else if (QFileInfo(url.toLocalFile()).isSymLink()) {
+            QFile file(url.toLocalFile());
+            if (!file.open(QIODevice::ReadOnly)) {
+                fileMoved = true;
+                break;
+            }
+            file.close();
         } else if (!QFileInfo(url.toLocalFile()).isReadable()) {
             fileMoved = true;
             break;
-        } else {
-            files.append(url.toLocalFile());
         }
+        files.append(url.toLocalFile());
     }
     if (notLocal && showError) {
         QMessageBox::information(this, windowTitle(), tr("can not send urls as files. this is a programming bug."));
@@ -390,6 +396,18 @@ bool LafdupWindow::outgoing(const QImage &image)
     return true;
 }
 
+bool LafdupWindow::isExcelDataCopied(const QMimeData *mimeData)
+{
+    if (mimeData->hasFormat("text/html")) {
+        QString html = mimeData->html();
+        if (html.contains("<table") || html.contains("x:str"))
+            return true;
+    }
+    if (mimeData->hasFormat("application/x-qt-windows-mime;value=\"Csv\""))
+        return true;
+    return false;
+}
+
 void LafdupWindow::sendContent()
 {
     const QString &text = ui->txtContent->toPlainText();
@@ -406,7 +424,8 @@ void LafdupWindow::sendContent()
 
 void LafdupWindow::sendFiles()
 {
-    const QList<QUrl> &fileUrls = QFileDialog::getOpenFileUrls(this, tr("select files to send."));
+    const QList<QUrl> &fileUrls = QFileDialog::getOpenFileUrls(this, tr("select files to send."), QString(), QString(),
+                                                               nullptr, QFileDialog::DontResolveSymlinks);
     if (fileUrls.isEmpty()) {
         return;
     }
@@ -433,7 +452,6 @@ bool LafdupWindow::outgoing(const CopyPaste &copyPaste)
 
 void LafdupWindow::onClipboardChanged()
 {
-
     const QClipboard *clipboard = QApplication::clipboard();
     const QMimeData *mimeData = clipboard->mimeData();
     if (!mimeData->hasImage() && !mimeData->hasUrls() && mimeData->hasText()) {
@@ -454,8 +472,9 @@ void LafdupWindow::onClipboardChanged()
     copyPaste.mimeType = CompType;
     copyPaste.ignoreLimits = false;
     copyPaste.text = mimeData->text();
-    qDebug() << copyPaste.text;
-    copyPaste.image = saveImage(mimeData->imageData().value<QImage>());
+    if (!isExcelDataCopied(mimeData)) {
+        copyPaste.image = saveImage(mimeData->imageData().value<QImage>());
+    }
     QStringList filelist;
     for (QUrl url : mimeData->urls()) {
         filelist.append(url.toLocalFile());
@@ -499,21 +518,21 @@ static bool updateClipboard(const CopyPaste &copyPaste, LafdupWindow *window)
     if (copyPaste.isComp()) {
         if (!copyPaste.text.isEmpty()) {
             clipboard->setText(copyPaste.text);
-        } else if (!copyPaste.image.isEmpty()) {
-            const QImage &image = loadImage(copyPaste.image);
-            clipboard->setImage(image);
-        } else if (!copyPaste.files.isEmpty()) {
+        }
+        if (!copyPaste.image.isEmpty()) {
+            clipboard->setImage(loadImage(copyPaste.image));
+        }
+        if (!copyPaste.files.isEmpty()) {
             QList<QUrl> urls;
             for (const QString &file : copyPaste.files) {
                 urls.append(QUrl::fromLocalFile(file));
             }
             QMimeData *mimeData = new QMimeData();
             mimeData->setUrls(urls);
+            qDebug() << "state:" << urls.isEmpty();
             clipboard->setMimeData(mimeData);
         }
-        return true;
-    }
-    if (copyPaste.isFile()) {
+    } else if (copyPaste.isFile()) {
         QList<QUrl> urls;
         for (const QString &file : copyPaste.files) {
             urls.append(QUrl::fromLocalFile(file));

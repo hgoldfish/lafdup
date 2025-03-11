@@ -50,6 +50,7 @@ private:
     bool outgoing(const QString &text, bool ignoreLimits);
     bool outgoing(const QList<QUrl> urls, bool showError, bool ignoreLimits);
     bool outgoing(const QImage &image);
+    bool isExcelDataCopied(const QMimeData *mimeData);
     void updateMyIP();
     void loadPassword();
     void loadConfiguration(bool withPassword);

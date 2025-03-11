@@ -42,7 +42,7 @@ private:
                               const QString &itsPeerName);
     QSharedPointer<lafrpc::Peer> handleRequestSync(QSharedPointer<qtng::SocketLike> request, qtng::DataChannelPole pole,
                                                    const QString &itsPeerName, const QString &itsAddress);
-    void _outgoing(CopyPaste copyPaste);
+    void _outgoingSync(CopyPaste copyPaste);
     bool canSendContent(const CopyPaste &copyPaste);
 
     bool findItem(const QDateTime &timestamp);

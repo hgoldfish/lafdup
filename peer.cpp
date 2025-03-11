@@ -940,7 +940,14 @@ static void _populate(const QDir &dir, const QString &relativePath, PopulateResu
             continue;
         }
         entry.path = relativePath.isEmpty() ? name : relativePath + "/" + name;
-        entry.size = static_cast<quint64>(fileInfo.size());
+        quint64 size = static_cast<quint64>(fileInfo.size());
+        if (fileInfo.isSymLink()) {
+            QFile file(fileInfo.absoluteFilePath());
+            file.open(QIODevice::ReadOnly);
+            size = static_cast<quint64>(file.size());
+            file.close();
+        }
+        entry.size = size;
         entry.isdir = fileInfo.isDir();
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
         entry.created = fileInfo.birthTime();

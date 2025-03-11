@@ -245,7 +245,7 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
     </message>
     <message>
         <location filename="../peer.cpp" line="359"/>
-        <location filename="../peer.cpp" line="858"/>
+        <location filename="../peer.cpp" line="859"/>
         <source>Sent successfully</source>
         <translation>发送成功</translation>
     </message>

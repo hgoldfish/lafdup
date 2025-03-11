@@ -440,7 +440,6 @@ bool LafdupWindow::outgoing(const CopyPaste &copyPaste)
 
 void LafdupWindow::onClipboardChanged()
 {
-
     const QClipboard *clipboard = QApplication::clipboard();
     const QMimeData *mimeData = clipboard->mimeData();
     if (!mimeData->hasImage() && !mimeData->hasUrls() && mimeData->hasText()) {
@@ -461,14 +460,13 @@ void LafdupWindow::onClipboardChanged()
     copyPaste.mimeType = CompType;
     copyPaste.ignoreLimits = false;
     copyPaste.text = mimeData->text();
-    qDebug() << copyPaste.text;
     copyPaste.image = saveImage(mimeData->imageData().value<QImage>());
     QStringList filelist;
     for (QUrl url : mimeData->urls()) {
         filelist.append(url.toLocalFile());
     }
     copyPaste.files = filelist;
-    outgoing(copyPaste);
+    Coroutine::spawn([this, copyPaste]() { this->outgoing(copyPaste);});
 }
 
 struct DisableSyncClipboard

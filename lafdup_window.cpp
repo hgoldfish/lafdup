@@ -55,14 +55,14 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
             return tr("Image");
         } else if (copyPaste.isComp()) {
             QString text;
-            if(!copyPaste.files.isEmpty()){
+            if (!copyPaste.files.isEmpty()) {
                 QStringList fileNames;
                 for (const QString &path : copyPaste.files) {
                     QFileInfo fileInfo(path);
                     fileNames.append(fileInfo.fileName());
                 }
                 return fileNames.join("\n");
-            }else if (!copyPaste.text.isEmpty()) {
+            } else if (!copyPaste.text.isEmpty()) {
                 text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
             } else if (!copyPaste.image.isEmpty()) {
                 return tr("Image");
@@ -93,19 +93,19 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
             return tr("Image");
         } else if (copyPaste.isComp()) {
             QString text;
-            if(!copyPaste.files.isEmpty()){
-                qDebug()<<"file";
+            if (!copyPaste.files.isEmpty()) {
+                qDebug() << "file";
                 QStringList fileNames;
                 for (const QString &path : copyPaste.files) {
                     QFileInfo fileInfo(path);
                     fileNames.append(fileInfo.absoluteFilePath());
                 }
                 return fileNames.join("\n");
-            }else if (!copyPaste.text.isEmpty()) {
-                qDebug()<<"text";
+            } else if (!copyPaste.text.isEmpty()) {
+                qDebug() << "text";
                 text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
             } else if (!copyPaste.image.isEmpty()) {
-                qDebug()<<"image";
+                qDebug() << "image";
                 return tr("Image");
             }
             return text;
@@ -330,12 +330,18 @@ bool LafdupWindow::outgoing(const QList<QUrl> urls, bool showError, bool ignoreL
         if (!url.isLocalFile()) {
             notLocal = true;
             break;
+        } else if (QFileInfo(url.toLocalFile()).isSymLink()) {
+            QFile file(url.toLocalFile());
+            if (!file.open(QIODevice::ReadOnly)) {
+                fileMoved = true;
+                break;
+            }
+            file.close();
         } else if (!QFileInfo(url.toLocalFile()).isReadable()) {
             fileMoved = true;
             break;
-        } else {
-            files.append(url.toLocalFile());
         }
+        files.append(url.toLocalFile());
     }
     if (notLocal && showError) {
         QMessageBox::information(this, windowTitle(), tr("can not send urls as files. this is a programming bug."));
@@ -406,7 +412,8 @@ void LafdupWindow::sendContent()
 
 void LafdupWindow::sendFiles()
 {
-    const QList<QUrl> &fileUrls = QFileDialog::getOpenFileUrls(this, tr("select files to send."));
+    const QList<QUrl> &fileUrls = QFileDialog::getOpenFileUrls(this, tr("select files to send."), QString(), QString(),
+                                                               nullptr, QFileDialog::DontResolveSymlinks);
     if (fileUrls.isEmpty()) {
         return;
     }

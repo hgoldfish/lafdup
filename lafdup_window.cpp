@@ -62,7 +62,7 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
                     fileNames.append(fileInfo.fileName());
                 }
                 return fileNames.join("\n");
-            } else if (!copyPaste.text.isEmpty()) {
+            } else if (!copyPaste.text.isEmpty() && !copyPaste.isTextHtml) {
                 text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
             } else if (!copyPaste.image.isEmpty()) {
                 return tr("Image");
@@ -101,12 +101,19 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
                     fileNames.append(fileInfo.absoluteFilePath());
                 }
                 return fileNames.join("\n");
-            } else if (!copyPaste.text.isEmpty()) {
-                qDebug() << "text";
+            } else if (!copyPaste.text.isEmpty() && !copyPaste.isTextHtml) {
                 text = QStringLiteral("%2\n%1").arg(copyPaste.timestamp.time().toString(Qt::ISODate), copyPaste.text);
             } else if (!copyPaste.image.isEmpty()) {
-                qDebug() << "image";
-                return tr("Image");
+                QPixmap pixmap;
+                pixmap.loadFromData(copyPaste.image);
+                if (pixmap.isNull())
+                    return QVariant();
+                pixmap = pixmap.scaled(200, 200, Qt::KeepAspectRatio);
+                QBuffer buffer;
+                buffer.open(QIODevice::WriteOnly);
+                pixmap.save(&buffer, "PNG");
+                QString base64 = QString("data:image/png;base64, %1").arg(QString(buffer.data().toBase64()));
+                return QString("<img src='%1'>").arg(base64);
             }
             return text;
         }
@@ -408,6 +415,35 @@ bool LafdupWindow::isExcelDataCopied(const QMimeData *mimeData)
     return false;
 }
 
+bool LafdupWindow::copyFolder(const QString &fromDir, const QString &toDir)
+{
+    QDir sourceDir(fromDir);
+    QDir targetDir(toDir);
+
+    if (!targetDir.exists()) {
+        if (!targetDir.mkdir(targetDir.absolutePath()))
+            return false;
+    }
+
+    QFileInfoList fileInfoList = sourceDir.entryInfoList();
+    foreach (QFileInfo fileInfo, fileInfoList) {
+        if (fileInfo.fileName() == "." || fileInfo.fileName() == "..")
+            continue;
+
+        if (fileInfo.isDir()) {
+            if (!copyFolder(fileInfo.filePath(), targetDir.filePath(fileInfo.fileName())))
+                return false;
+        } else {
+            if (targetDir.exists(fileInfo.fileName())) {
+                targetDir.remove(fileInfo.fileName());
+            }
+            if (!QFile::copy(fileInfo.filePath(), targetDir.filePath(fileInfo.fileName()))) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
 void LafdupWindow::sendContent()
 {
     const QString &text = ui->txtContent->toPlainText();
@@ -444,6 +480,62 @@ void LafdupWindow::sendAction()
     MessageTips::showMessageTips(tipStr, this);
 }
 
+void LafdupWindow::saveTextToLocal()
+{
+    QString filePath =
+            QFileDialog::getSaveFileName(nullptr, tr("save files"), QDir::homePath(), tr("txt file (*.txt)"));
+    if (filePath.isEmpty()) {
+        return;
+    }
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("错误"), tr("文件保存失败：") + file.errorString());
+        return;
+    }
+    const QModelIndex current = ui->lstCopyPaste->currentIndex();
+    CopyPaste item = copyPasteModel->copyPasteAt(current);
+    QString text = item.text;
+    QByteArray bytes = text.toLocal8Bit();
+    file.write(bytes);
+    file.close();
+}
+
+void LafdupWindow::saveFilesToLocal()
+{
+    QString directoryPath = QFileDialog::getExistingDirectory(nullptr, tr("save files"), QDir::homePath());
+    if (directoryPath.isEmpty()) {
+        return;
+    }
+    const QModelIndex current = ui->lstCopyPaste->currentIndex();
+    CopyPaste item = copyPasteModel->copyPasteAt(current);
+    for (QString file : item.files) {
+        if (QFileInfo(file).isDir()) {
+            QDir dir(directoryPath);
+            dir.mkdir(QFileInfo(file).fileName());
+            copyFolder(file, directoryPath + "/" + QFileInfo(file).fileName());
+        } else {
+            QFile::copy(file, directoryPath + "/" + QFileInfo(file).fileName());
+        }
+    }
+}
+
+void LafdupWindow::savaImageToLocal()
+{
+    QString filePath = QFileDialog::getSaveFileName(nullptr, "保存文件", QDir::homePath(), "所有文件 (*.jpg)");
+    if (filePath.isEmpty()) {
+        return;
+    }
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        QMessageBox::warning(this, tr("错误"), tr("文件保存失败：") + file.errorString());
+        return;
+    }
+    const QModelIndex current = ui->lstCopyPaste->currentIndex();
+    CopyPaste item = copyPasteModel->copyPasteAt(current);
+    file.write(item.image);
+    file.close();
+}
+
 bool LafdupWindow::outgoing(const CopyPaste &copyPaste)
 {
     peer->outgoing(copyPaste);
@@ -471,13 +563,18 @@ void LafdupWindow::onClipboardChanged()
     copyPaste.direction = CopyPaste::Outgoing;
     copyPaste.mimeType = CompType;
     copyPaste.ignoreLimits = false;
+    if (mimeData->hasHtml()) {
+        copyPaste.isTextHtml = 1;
+    }
     copyPaste.text = mimeData->text();
     if (!isExcelDataCopied(mimeData)) {
         copyPaste.image = saveImage(mimeData->imageData().value<QImage>());
     }
     QStringList filelist;
     for (QUrl url : mimeData->urls()) {
-        filelist.append(url.toLocalFile());
+        if (!url.toLocalFile().isEmpty()) {
+            filelist.append(url.toLocalFile());
+        }
     }
     copyPaste.files = filelist;
     outgoing(copyPaste);
@@ -516,22 +613,23 @@ static bool updateClipboard(const CopyPaste &copyPaste, LafdupWindow *window)
     QClipboard *clipboard = QApplication::clipboard();
     DisableSyncClipboard _(clipboard, window);
     if (copyPaste.isComp()) {
+        QMimeData *mimeData = new QMimeData();
         if (!copyPaste.text.isEmpty()) {
-            clipboard->setText(copyPaste.text);
+            if (!copyPaste.isTextHtml) {
+                mimeData->setText(copyPaste.text);
+            }
         }
         if (!copyPaste.image.isEmpty()) {
-            clipboard->setImage(loadImage(copyPaste.image));
+            mimeData->setImageData(loadImage(copyPaste.image));
         }
         if (!copyPaste.files.isEmpty()) {
             QList<QUrl> urls;
             for (const QString &file : copyPaste.files) {
                 urls.append(QUrl::fromLocalFile(file));
             }
-            QMimeData *mimeData = new QMimeData();
             mimeData->setUrls(urls);
-            qDebug() << "state:" << urls.isEmpty();
-            clipboard->setMimeData(mimeData);
         }
+        clipboard->setMimeData(mimeData);
     } else if (copyPaste.isFile()) {
         QList<QUrl> urls;
         for (const QString &file : copyPaste.files) {
@@ -577,6 +675,34 @@ void LafdupWindow::showContextMenu(const QPoint &)
     menu.addSeparator();
     menu.addAction(ui->actionRemove);
     menu.addAction(ui->actionClearAll);
+    QMenu *subMenu = menu.addMenu("另存为");
+    CopyPaste item = copyPasteModel->copyPasteAt(current);
+    QAction *textAction = nullptr;
+    QAction *fileAction = nullptr;
+    QAction *imageAction = nullptr;
+    if (item.isText()) {
+        textAction = subMenu->addAction("文本");
+    }
+    if (item.isFile()) {
+        fileAction = subMenu->addAction("文件");
+    }
+    if (item.isImage()) {
+        imageAction = subMenu->addAction("图片");
+    }
+    if (item.isComp()) {
+        if (!item.text.isEmpty()) {
+            textAction = subMenu->addAction("文本");
+        }
+        if (!item.files.isEmpty()) {
+            fileAction = subMenu->addAction("文件");
+        }
+        if (!item.image.isEmpty()) {
+            imageAction = subMenu->addAction("图片");
+        }
+    }
+    connect(textAction, &QAction::triggered, this, &LafdupWindow::saveTextToLocal);
+    connect(fileAction, &QAction::triggered, this, &LafdupWindow::saveFilesToLocal);
+    connect(imageAction, &QAction::triggered, this, &LafdupWindow::savaImageToLocal);
     menu.exec(QCursor::pos());
 }
 

@@ -43,6 +43,9 @@ private slots:
     void sendFiles();
     void sendFeedBackTips(QString tips);
     void sendAction();
+    void saveTextToLocal();
+    void saveFilesToLocal();
+    void savaImageToLocal();
 public slots:
     void onClipboardChanged();
 private:
@@ -51,6 +54,7 @@ private:
     bool outgoing(const QList<QUrl> urls, bool showError, bool ignoreLimits);
     bool outgoing(const QImage &image);
     bool isExcelDataCopied(const QMimeData *mimeData);
+    bool copyFolder(const QString &fromDir, const QString &toDir);
     void updateMyIP();
     void loadPassword();
     void loadConfiguration(bool withPassword);

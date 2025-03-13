@@ -46,10 +46,15 @@ bool LafdupRemoteStub::pasteCompText(const QDateTime &timestamp, const QString &
     PasteHashKey key(parent->rpc->getCurrentPeer()->name(), timestamp);
     CopyPaste item;
     item = pasteHash[key];
+    if (text[0] == '1') {
+        item.isTextHtml = 1;
+    } else {
+        item.isTextHtml = 0;
+    }
     item.direction = CopyPaste::Incoming;
     item.timestamp = timestamp;
     item.mimeType = CompType;
-    item.text = text;
+    item.text = text.mid(1);
     pasteHash[key] = item;
     return true;
 }
@@ -772,8 +777,14 @@ bool LafdupPeer::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const Copy
         t->kill();
     } else if (copyPaste.mimeType == CompType) {
         if (!copyPaste.text.isEmpty()) {
+            QString text;
+            if (copyPaste.isTextHtml) {
+                text = "1" + copyPaste.text;
+            } else {
+                text = "0" + copyPaste.text;
+            }
             try {
-                result = peer->call("lafdup.pasteCompText", copyPaste.timestamp, copyPaste.text).toBool();
+                result = peer->call("lafdup.pasteCompText", copyPaste.timestamp, text).toBool();
             } catch (RpcException &e) {
                 *errorString = e.what();
                 return result;

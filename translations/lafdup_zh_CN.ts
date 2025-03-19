@@ -159,12 +159,12 @@
         <translation>启动时最小化</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1079"/>
+        <location filename="../lafdup_window.cpp" line="1091"/>
         <source>Select Cache Directory to Receive Files.</source>
         <translation>选择一个文件夹接收文件</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1112"/>
+        <location filename="../lafdup_window.cpp" line="1124"/>
         <source>%1 is not a valid IP.</source>
         <translation>%1 是一个无效IP</translation>
     </message>
@@ -225,12 +225,12 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>选择一个目录接收其他节点发送的文件</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1262"/>
+        <location filename="../lafdup_window.cpp" line="1274"/>
         <source>Setting Guide</source>
         <translation>设置引导</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1285"/>
+        <location filename="../lafdup_window.cpp" line="1297"/>
         <source>Select Cache Directory to Receive Files.</source>
         <translation>选择一个文件夹接收文件</translation>
     </message>
@@ -244,7 +244,6 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
     </message>
     <message>
         <location filename="../peer.cpp" line="363"/>
-        <location filename="../peer.cpp" line="868"/>
         <source>Sent successfully</source>
         <translation>发送成功</translation>
     </message>
@@ -453,9 +452,14 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="777"/>
+        <location filename="../lafdup_window.cpp" line="789"/>
         <source>My IP Addresses:</source>
         <translation>本机IP：</translation>
+    </message>
+    <message>
+        <location filename="../main.ui"/>
+        <source>置顶固定窗口</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -476,7 +480,7 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>发送内容密码</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="893"/>
+        <location filename="../lafdup_window.cpp" line="905"/>
         <source>Password is empty.</source>
         <translation>密码为空</translation>
     </message>

@@ -233,7 +233,7 @@ LafdupWindow::LafdupWindow()
     connect(ui->actionSetToClipboard, SIGNAL(triggered(bool)), SLOT(setToClipboard()));
     connect(ui->actionRemove, SIGNAL(triggered(bool)), SLOT(removeCopyPaste()));
     connect(ui->actionClearAll, SIGNAL(triggered(bool)), SLOT(clearAll()));
-
+    connect(ui->cbxTop, &QCheckBox::stateChanged, this, &LafdupWindow::setWindowTop);
     QClipboard *clipboard = QApplication::clipboard();
     connect(clipboard, &QClipboard::dataChanged, this, &LafdupWindow::onClipboardChanged);
 
@@ -534,6 +534,18 @@ void LafdupWindow::savaImageToLocal()
     CopyPaste item = copyPasteModel->copyPasteAt(current);
     file.write(item.image);
     file.close();
+}
+
+void LafdupWindow::setWindowTop(int state)
+{
+    if (state == Qt::Checked) {
+        setWindowFlag(Qt::WindowStaysOnTopHint, true);
+        this->show();
+    } else if (state == Qt::Unchecked) {
+        setWindowFlag(Qt::WindowStaysOnTopHint, false);
+    } else {
+        return;
+    }
 }
 
 bool LafdupWindow::outgoing(const CopyPaste &copyPaste)

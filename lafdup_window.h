@@ -46,6 +46,7 @@ private slots:
     void saveTextToLocal();
     void saveFilesToLocal();
     void savaImageToLocal();
+    void setWindowTop(int state);
 public slots:
     void onClipboardChanged();
 private:

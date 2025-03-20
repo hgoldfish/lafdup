@@ -283,7 +283,12 @@ void LafdupWindow::changeEvent(QEvent *event)
 void LafdupWindow::closeEvent(QCloseEvent *event)
 {
     QWidget::closeEvent(event);
-    QTimer::singleShot(0, QCoreApplication::instance(), SLOT(quit()));
+    if (isVisible()) {
+        hide(); // 隐藏而非关闭
+        event->ignore();
+    } else {
+        QApplication::quit(); // 显式退出
+    }
 }
 
 void LafdupWindow::dropEvent(QDropEvent *event)

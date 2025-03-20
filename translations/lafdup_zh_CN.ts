@@ -159,12 +159,12 @@
         <translation>启动时最小化</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1091"/>
+        <location filename="../lafdup_window.cpp" line="1096"/>
         <source>Select Cache Directory to Receive Files.</source>
         <translation>选择一个文件夹接收文件</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1124"/>
+        <location filename="../lafdup_window.cpp" line="1129"/>
         <source>%1 is not a valid IP.</source>
         <translation>%1 是一个无效IP</translation>
     </message>
@@ -225,12 +225,12 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>选择一个目录接收其他节点发送的文件</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1274"/>
+        <location filename="../lafdup_window.cpp" line="1279"/>
         <source>Setting Guide</source>
         <translation>设置引导</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1297"/>
+        <location filename="../lafdup_window.cpp" line="1302"/>
         <source>Select Cache Directory to Receive Files.</source>
         <translation>选择一个文件夹接收文件</translation>
     </message>
@@ -404,55 +404,55 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>同步剪贴板被最小化到托盘图标。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="354"/>
+        <location filename="../lafdup_window.cpp" line="359"/>
         <source>can not send urls as files. this is a programming bug.</source>
         <translation>不能将url作为文件发送。这是一个编程错误.</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="358"/>
+        <location filename="../lafdup_window.cpp" line="363"/>
         <source>can not send files. some file is moved.</source>
         <translation>不能发送文件，某些文件被移动。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="452"/>
+        <location filename="../lafdup_window.cpp" line="457"/>
         <source>Can not send empty content.</source>
         <translation>发送内容不能为空。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="463"/>
+        <location filename="../lafdup_window.cpp" line="468"/>
         <source>select files to send.</source>
         <translation>选择文件发送。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="479"/>
+        <location filename="../lafdup_window.cpp" line="484"/>
         <source>Start sending</source>
         <translation>开始发送</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="486"/>
-        <location filename="../lafdup_window.cpp" line="505"/>
+        <location filename="../lafdup_window.cpp" line="491"/>
+        <location filename="../lafdup_window.cpp" line="510"/>
         <source>save files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="486"/>
+        <location filename="../lafdup_window.cpp" line="491"/>
         <source>txt file (*.txt)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="492"/>
-        <location filename="../lafdup_window.cpp" line="530"/>
+        <location filename="../lafdup_window.cpp" line="497"/>
+        <location filename="../lafdup_window.cpp" line="535"/>
         <source>错误</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="492"/>
-        <location filename="../lafdup_window.cpp" line="530"/>
+        <location filename="../lafdup_window.cpp" line="497"/>
+        <location filename="../lafdup_window.cpp" line="535"/>
         <source>文件保存失败：</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="789"/>
+        <location filename="../lafdup_window.cpp" line="794"/>
         <source>My IP Addresses:</source>
         <translation>本机IP：</translation>
     </message>
@@ -480,7 +480,7 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>发送内容密码</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="905"/>
+        <location filename="../lafdup_window.cpp" line="910"/>
         <source>Password is empty.</source>
         <translation>密码为空</translation>
     </message>
@@ -488,12 +488,12 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../main.cpp" line="45"/>
+        <location filename="../main.cpp" line="46"/>
         <source>tips</source>
         <translation>提示</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="46"/>
+        <location filename="../main.cpp" line="47"/>
         <source>The program is running, please exit first if necessary</source>
         <translation>已有程序在运行，如有需要请先退出</translation>
     </message>

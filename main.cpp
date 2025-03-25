@@ -22,6 +22,7 @@ int main(int argc, char **argv)
     app.setApplicationName("SyncClipboard");
     app.setApplicationVersion("1.0");
     app.setWindowIcon(QIcon(":/images/bluefish.png"));
+    app.setQuitOnLastWindowClosed(false);
 
     QCommandLineParser parser;
     parser.setApplicationDescription("Keep clipboard synchroized to other PCs.");

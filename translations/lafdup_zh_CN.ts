@@ -488,12 +488,12 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../main.cpp" line="45"/>
+        <location filename="../main.cpp" line="46"/>
         <source>tips</source>
         <translation>提示</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="46"/>
+        <location filename="../main.cpp" line="47"/>
         <source>The program is running, please exit first if necessary</source>
         <translation>已有程序在运行，如有需要请先退出</translation>
     </message>

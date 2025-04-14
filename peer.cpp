@@ -652,7 +652,7 @@ void LafdupPeer::writeInformation(const QDir destDir)
     QSettings settings(iniFilePath, QSettings::IniFormat);
     settings.setIniCodec("UTF-8");
     settings.beginGroup("clean_files");
-    settings.setValue("created", QDateTime::currentDateTime());
+    settings.setValue("created", QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"));
 }
 
 void LafdupPeer::cleanFiles()
@@ -701,7 +701,9 @@ void LafdupPeer::_cleanFiles(const QDir &dir, bool cleanAll)
             Q_ASSERT(deleteFilesTime != 0);
             QSettings settings(iniFilePath, QSettings::IniFormat);
             settings.beginGroup("clean_files");
-            const QDateTime &timestamp = settings.value("created", now).toDateTime();
+            const QDateTime &timestamp =
+                    QDateTime::fromString(settings.value("created", now).toString(), "yyyy-MM-dd hh:mm:ss");
+            qDebug() << timestamp;
             if (!timestamp.isValid()) {
                 continue;
             }
@@ -714,6 +716,8 @@ void LafdupPeer::_cleanFiles(const QDir &dir, bool cleanAll)
         callInThread([subdir] {
             if (!subdir->removeRecursively()) {
                 qDebug() << "can not remove directory:" << subdir;
+            } else {
+                qDebug() << "remove directory:" << subdir << " sucess";
             }
         });
     }
@@ -777,9 +781,9 @@ bool LafdupPeer::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const Copy
         t->kill();
     } else if (copyPaste.mimeType == CompType) {
         if (!copyPaste.text.isEmpty()) {
-            QString text=copyPaste.text;
+            QString text = copyPaste.text;
             try {
-                result = peer->call("lafdup.pasteCompText", copyPaste.timestamp, text,copyPaste.isTextHtml).toBool();
+                result = peer->call("lafdup.pasteCompText", copyPaste.timestamp, text, copyPaste.isTextHtml).toBool();
             } catch (RpcException &e) {
                 *errorString = e.what();
                 return false;
@@ -800,7 +804,8 @@ bool LafdupPeer::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const Copy
                 }
             });
             try {
-                result = peer->call("lafdup.pasteCompImage", copyPaste.timestamp, QVariant::fromValue(rpcFile)).toBool();
+                result =
+                        peer->call("lafdup.pasteCompImage", copyPaste.timestamp, QVariant::fromValue(rpcFile)).toBool();
             } catch (RpcException &e) {
                 *errorString = e.what();
                 return false;

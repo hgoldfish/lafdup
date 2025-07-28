@@ -388,21 +388,6 @@ static inline QImage loadImage(QByteArray data)
     return image;
 }
 
-bool LafdupWindow::outgoing(const QImage &image)
-{
-    if (image.isNull()) {
-        return false;
-    }
-    CopyPaste copyPaste;
-    copyPaste.timestamp = QDateTime::currentDateTime();
-    copyPaste.direction = CopyPaste::Outgoing;
-    copyPaste.mimeType = ImageType;
-    copyPaste.image = saveImage(image);
-    copyPaste.ignoreLimits = false;
-    peer->outgoing(copyPaste);
-    return true;
-}
-
 bool LafdupWindow::isExcelDataCopied(const QMimeData *mimeData)
 {
     if (mimeData->hasFormat("text/html")) {
@@ -560,10 +545,6 @@ void LafdupWindow::onClipboardChanged()
     const QMimeData *mimeData = clipboard->mimeData();
     if (!mimeData->hasImage() && !mimeData->hasUrls() && mimeData->hasText()) {
         outgoing(mimeData->text(), false);
-        return;
-    }
-    if (mimeData->hasImage() && !mimeData->hasUrls() && !mimeData->hasText()) {
-        outgoing(mimeData->imageData().value<QImage>());
         return;
     }
     if (!clipboard->mimeData()->hasImage() && clipboard->mimeData()->hasUrls() && !clipboard->mimeData()->hasText()) {

@@ -159,12 +159,12 @@
         <translation>启动时最小化</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1091"/>
+        <location filename="../lafdup_window.cpp" line="1072"/>
         <source>Select Cache Directory to Receive Files.</source>
         <translation>选择一个文件夹接收文件</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1124"/>
+        <location filename="../lafdup_window.cpp" line="1105"/>
         <source>%1 is not a valid IP.</source>
         <translation>%1 是一个无效IP</translation>
     </message>
@@ -225,12 +225,12 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>选择一个目录接收其他节点发送的文件</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1274"/>
+        <location filename="../lafdup_window.cpp" line="1255"/>
         <source>Setting Guide</source>
         <translation>设置引导</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="1297"/>
+        <location filename="../lafdup_window.cpp" line="1278"/>
         <source>Select Cache Directory to Receive Files.</source>
         <translation>选择一个文件夹接收文件</translation>
     </message>
@@ -414,45 +414,45 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>不能发送文件，某些文件被移动。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="452"/>
+        <location filename="../lafdup_window.cpp" line="437"/>
         <source>Can not send empty content.</source>
         <translation>发送内容不能为空。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="463"/>
+        <location filename="../lafdup_window.cpp" line="448"/>
         <source>select files to send.</source>
         <translation>选择文件发送。</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="479"/>
+        <location filename="../lafdup_window.cpp" line="464"/>
         <source>Start sending</source>
         <translation>开始发送</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="486"/>
-        <location filename="../lafdup_window.cpp" line="505"/>
+        <location filename="../lafdup_window.cpp" line="471"/>
+        <location filename="../lafdup_window.cpp" line="490"/>
         <source>save files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="486"/>
+        <location filename="../lafdup_window.cpp" line="471"/>
         <source>txt file (*.txt)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="492"/>
-        <location filename="../lafdup_window.cpp" line="530"/>
+        <location filename="../lafdup_window.cpp" line="477"/>
+        <location filename="../lafdup_window.cpp" line="515"/>
         <source>错误</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="492"/>
-        <location filename="../lafdup_window.cpp" line="530"/>
+        <location filename="../lafdup_window.cpp" line="477"/>
+        <location filename="../lafdup_window.cpp" line="515"/>
         <source>文件保存失败：</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="789"/>
+        <location filename="../lafdup_window.cpp" line="770"/>
         <source>My IP Addresses:</source>
         <translation>本机IP：</translation>
     </message>
@@ -480,7 +480,7 @@ Sending and receiving can only be achieved if the sender and receiver use the sa
         <translation>发送内容密码</translation>
     </message>
     <message>
-        <location filename="../lafdup_window.cpp" line="905"/>
+        <location filename="../lafdup_window.cpp" line="886"/>
         <source>Password is empty.</source>
         <translation>密码为空</translation>
     </message>

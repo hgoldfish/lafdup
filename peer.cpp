@@ -54,7 +54,6 @@ bool LafdupRemoteStub::pasteCompText(const QDateTime &timestamp, const QString &
     item.direction = CopyPaste::Incoming;
     item.timestamp = timestamp;
     item.mimeType = CompType;
-    item.text = text.mid(1);
     pasteHash[key] = item;
     return true;
 }

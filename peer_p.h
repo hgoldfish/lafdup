@@ -21,7 +21,7 @@ public slots:
     bool pasteText(const QDateTime &timestamp, const QString &text);
     bool pasteFiles(const QDateTime &timestamp, QSharedPointer<lafrpc::RpcDir> rpcDir);
     bool pasteImage(const QDateTime &timestamp, QSharedPointer<lafrpc::RpcFile> image);
-    bool pasteCompText(const QDateTime &timestamp, const QString &text);
+    bool pasteCompText(const QDateTime &timestamp, const QString &text,const bool &isHasTextHtml);
     bool pasteCompImage(const QDateTime &timestamp, QSharedPointer<lafrpc::RpcFile> image);
     bool pasteCompFiles(const QDateTime &timestamp, QSharedPointer<lafrpc::RpcDir> rpcDir);
     bool pasteEnd(const QDateTime &time);

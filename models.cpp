@@ -1,10 +1,11 @@
-#include "models.h"
+﻿#include "models.h"
 
 CopyPaste::CopyPaste(const Direction &direction, const QDateTime &timestamp, const QString &text)
     : direction(direction)
     , timestamp(timestamp)
     , mimeType(TextType)
     , text(text)
+    , isTextHtml(false)
 {
 }
 

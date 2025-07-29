@@ -42,7 +42,7 @@ private:
                               const QString &itsPeerName);
     QSharedPointer<lafrpc::Peer> handleRequestSync(QSharedPointer<qtng::SocketLike> request, qtng::DataChannelPole pole,
                                                    const QString &itsPeerName, const QString &itsAddress);
-    void _outgoing(CopyPaste copyPaste);
+    void _outgoingSync(CopyPaste copyPaste);
     bool canSendContent(const CopyPaste &copyPaste);
 
     bool findItem(const QDateTime &timestamp);
@@ -51,8 +51,6 @@ private:
     void cleanFiles();
     void _cleanFiles(const QDir &dir, bool cleanAll);
     bool sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const CopyPaste &copyPaste, QString *errorString);
-    bool resultFeedBack(QSharedPointer<lafrpc::Peer> peer, QVariant result, QString errorText,
-                        const CopyPaste &copyPaste);
 private:
     QSharedPointer<LafdupDiscovery> discovery;
     QSharedPointer<LafdupRemoteStub> stub;

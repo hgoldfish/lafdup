@@ -26,6 +26,7 @@ public:
     QByteArray image;
     QStringList files;
     bool ignoreLimits;
+    bool isTextHtml;
 public:
     bool isText() const { return mimeType == TextType; }
     bool isFile() const { return mimeType == BinaryType; }

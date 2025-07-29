@@ -1,4 +1,4 @@
-﻿#include "lafdup_window_p.h"
+#include "lafdup_window_p.h"
 #include "lafdupapplication.h"
 #include "ui_configure.h"
 #include "ui_main.h"
@@ -570,7 +570,7 @@ void LafdupWindow::onClipboardChanged()
         }
     }
     copyPaste.files = filelist;
-    outgoing(copyPaste);
+    Coroutine::spawn([this, copyPaste]() { this->outgoing(copyPaste);});
 }
 
 struct DisableSyncClipboard

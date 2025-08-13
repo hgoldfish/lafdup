@@ -1,6 +1,6 @@
-﻿#include <QtCore/qloggingcategory.h>
+#include <QtCore/qloggingcategory.h>
 #include <QtCore/qsettings.h>
-#include <QtCore/qscopeguard.h>
+#include <QtCore/qscopedvaluerollback.h>
 #include "discovery.h"
 #include "peer_p.h"
 
@@ -67,7 +67,7 @@ bool LafdupRemoteStub::pasteCompImage(const QDateTime &timestamp, QSharedPointer
     QByteArray imageData;
     bool ok = image->recvall(imageData);
     if (!ok) {
-        qDebug() << "can not receive image data.";
+        qCDebug(logger) << "can not receive image data.";
         throw RpcRemoteException(tr("Failed to receive the picture"));
     }
     PasteHashKey key(name, timestamp);
@@ -191,7 +191,7 @@ bool LafdupRemoteStub::pasteImage(const QDateTime &timestamp, QSharedPointer<Rpc
     QByteArray imageData;
     bool ok = image->recvall(imageData);
     if (!ok) {
-        qDebug() << "can not receive image data.";
+        qCDebug(logger) << "can not receive image data.";
         throw RpcRemoteException(tr("Failed to receive the picture"));
     }
     CopyPaste item;
@@ -296,17 +296,6 @@ public:
     QList<QFileInfo> fileInfoList;
 };
 
-static inline bool lessThan(QSharedPointer<Peer> peer1, QSharedPointer<Peer> peer2)
-{
-    const QString &address1 = peer1->address();
-    const QString &address2 = peer2->address();
-    if (address1.startsWith("tcp://") && address2.startsWith("kcp://")) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
 static bool isPassword(const QString &text)
 {
     if (text.size() > 18) {
@@ -362,7 +351,6 @@ void LafdupPeer::_outgoingSync(CopyPaste copyPaste)
         emit sendFeedBack(tr("Sent successfully"));
         if (!findItem(copyPaste)) {
             items.prepend(copyPaste);
-            qDebug() << "incoming";
             emit incoming(copyPaste);
         }
     } else {
@@ -546,11 +534,11 @@ QSharedPointer<Peer> LafdupPeer::handleRequestSync(QSharedPointer<qtng::SocketLi
     try {
         qtng::Timeout timeout(5.0);
         Q_UNUSED(timeout);
-        qDebug() << "got kcp peer:" << itsAddress << pole;
+        qCDebug(logger) << "got kcp peer:" << itsAddress << pole;
         peer = rpc->preparePeer(channel, itsPeerName, itsAddress);
-        qDebug() << "got rpc peer:" << !peer.isNull();
+        qCDebug(logger) << "got rpc peer:" << !peer.isNull();
     } catch (TimeoutException &) {
-        qDebug() << "got rpc peer timeout:" << false;
+        qCDebug(logger) << "got rpc peer timeout:" << false;
     }
     return peer;
 }
@@ -683,8 +671,7 @@ void LafdupPeer::_cleanFiles(const QDir &dir, bool cleanAll)
     if (cleaningFiles) {
         return;
     }
-    cleaningFiles = true;
-    auto cleanup = qScopeGuard([this] { cleaningFiles = false; });
+    QScopedValueRollback<bool> svr(cleaningFiles, true);
     const QDateTime &now = QDateTime::currentDateTime();
     for (const QFileInfo &fileInfo :
          static_cast<const QFileInfoList>(dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot))) {
@@ -702,21 +689,20 @@ void LafdupPeer::_cleanFiles(const QDir &dir, bool cleanAll)
             settings.beginGroup("clean_files");
             const QDateTime &timestamp =
                     QDateTime::fromString(settings.value("created", now).toString(), "yyyy-MM-dd hh:mm:ss");
-            qDebug() << timestamp;
             if (!timestamp.isValid()) {
                 continue;
             }
-            qDebug() << now << timestamp << timestamp.msecsTo(now) << (deleteFilesTime * 60 * 1000);
+            qCDebug(logger) << "want to clean deprecated files:" << now << timestamp << timestamp.msecsTo(now) << (deleteFilesTime * 60 * 1000);
             if (timestamp.msecsTo(now) < (deleteFilesTime * 60 * 1000)) {
-                qDebug() << "skip directory" << subdir->path();
+                qCDebug(logger) << "skip directory" << subdir->path();
                 continue;
             }
         }
         callInThread([subdir] {
             if (!subdir->removeRecursively()) {
-                qDebug() << "can not remove directory:" << subdir;
+                qCDebug(logger) << "can not remove directory:" << subdir;
             } else {
-                qDebug() << "remove directory:" << subdir << " sucess";
+                qCDebug(logger) << "remove directory:" << subdir << " sucess";
             }
         });
     }
@@ -797,14 +783,8 @@ bool LafdupPeer::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const Copy
             rpcFile->setName("image.png");
             rpcFile->setSize(static_cast<quint64>(imageData.size()));
             QSharedPointer<Coroutine> t1 = operations->spawn([rpcFile, imageData] { rpcFile->sendall(imageData); });
-            auto cleanup = qScopeGuard([&t1]() {
-                if (t1) {
-                    t1->kill();
-                }
-            });
             try {
-                result =
-                        peer->call("lafdup.pasteCompImage", copyPaste.timestamp, QVariant::fromValue(rpcFile)).toBool();
+                result = peer->call("lafdup.pasteCompImage", copyPaste.timestamp, QVariant::fromValue(rpcFile)).toBool();
             } catch (RpcException &e) {
                 *errorString = e.what();
                 return false;
@@ -824,11 +804,6 @@ bool LafdupPeer::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const Copy
             rpcDir->setEntries(populateResult.entries);
             rpcDir->setSize(populateResult.totalSize);
             QSharedPointer<Coroutine> t2 = operations->spawn([rpcDir, provider] { rpcDir->readFrom(provider); });
-            auto cleanup = qScopeGuard([&t2]() {
-                if (t2) {
-                    t2->kill();
-                }
-            });
             try {
                 result = peer->call("lafdup.pasteCompFiles", copyPaste.timestamp, QVariant::fromValue(rpcDir)).toBool();
             } catch (RpcException &e) {
@@ -887,7 +862,7 @@ QString VirtualRpcDirFileProvider::makePath(const QString &filePath)
                 return path;
             } else {
                 if (!fileInfo.isDir()) {
-                    qDebug() << "invalid path:" << filePath;
+                    qCDebug(logger) << "invalid path:" << filePath;
                 } else {
                     QDir dir(path);
                     return dir.filePath(subpaths.join("/"));

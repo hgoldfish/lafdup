@@ -1,4 +1,4 @@
-﻿#ifndef LAFDUP_WINDOW_H
+#ifndef LAFDUP_WINDOW_H
 #define LAFDUP_WINDOW_H
 #include <QtCore/qabstractitemmodel.h>
 #include <QtWidgets/qwidget.h>
@@ -50,7 +50,6 @@ private slots:
 public slots:
     void onClipboardChanged();
 private:
-    bool outgoing(const CopyPaste &copyPaste);
     bool outgoing(const QString &text, bool ignoreLimits);
     bool outgoing(const QList<QUrl> urls, bool showError, bool ignoreLimits);
     bool isExcelDataCopied(const QMimeData *mimeData);

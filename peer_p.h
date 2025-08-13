@@ -1,7 +1,8 @@
-﻿#ifndef LAFDUP_PEER_PH
+#ifndef LAFDUP_PEER_PH
 #define LAFDUP_PEER_PH
 
 #include "peer.h"
+
 struct PasteHashKey
 {
     PasteHashKey(QString _name, QDateTime _time)
@@ -12,6 +13,7 @@ struct PasteHashKey
     QString name;
     QDateTime time;
 };
+
 class LafdupRemoteStub : public QObject
 {
     Q_OBJECT
@@ -31,14 +33,17 @@ private:
     LafdupPeer *parent;
     QHash<PasteHashKey, CopyPaste> pasteHash;
 };
+
 inline bool operator==(const PasteHashKey &p1, const PasteHashKey &p2)
 {
     return (p1.name == p2.name) && (p1.time == p2.time);
 };
+
 inline uint qHash(const PasteHashKey &key, uint seed) noexcept
 {
     uint hash = qHash(key.name, seed);
     hash ^= qHash(key.time, hash);
     return hash;
 }
+
 #endif

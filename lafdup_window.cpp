@@ -94,7 +94,6 @@ QVariant CopyPasteModel::data(const QModelIndex &index, int role) const
         } else if (copyPaste.isComp()) {
             QString text;
             if (!copyPaste.files.isEmpty()) {
-                qDebug() << "file";
                 QStringList fileNames;
                 for (const QString &path : copyPaste.files) {
                     QFileInfo fileInfo(path);
@@ -233,7 +232,7 @@ LafdupWindow::LafdupWindow()
     connect(ui->actionSetToClipboard, SIGNAL(triggered(bool)), SLOT(setToClipboard()));
     connect(ui->actionRemove, SIGNAL(triggered(bool)), SLOT(removeCopyPaste()));
     connect(ui->actionClearAll, SIGNAL(triggered(bool)), SLOT(clearAll()));
-    connect(ui->cbxTop, &QCheckBox::stateChanged, this, &LafdupWindow::setWindowTop);
+    // connect(ui->cbxTop, &QCheckBox::stateChanged, this, &LafdupWindow::setWindowTop);
     QClipboard *clipboard = QApplication::clipboard();
     connect(clipboard, &QClipboard::dataChanged, this, &LafdupWindow::onClipboardChanged);
 
@@ -533,12 +532,6 @@ void LafdupWindow::setWindowTop(int state)
     }
 }
 
-bool LafdupWindow::outgoing(const CopyPaste &copyPaste)
-{
-    peer->outgoing(copyPaste);
-    return false;
-}
-
 void LafdupWindow::onClipboardChanged()
 {
     const QClipboard *clipboard = QApplication::clipboard();
@@ -570,7 +563,7 @@ void LafdupWindow::onClipboardChanged()
         }
     }
     copyPaste.files = filelist;
-    Coroutine::spawn([this, copyPaste]() { this->outgoing(copyPaste);});
+    peer->outgoing(copyPaste);
 }
 
 struct DisableSyncClipboard
@@ -1243,12 +1236,12 @@ GuideDialog::GuideDialog(QWidget *parent)
     QDir dir(newPath);
     if (!dir.exists()) {
         if (dir.mkpath(newPath)) {
-            qDebug() << u8"创建成功";
+            qDebug() << "创建成功";
         } else {
-            qDebug() << u8"创建失败";
+            qDebug() << "创建失败";
         }
     } else {
-        qDebug() << u8"文件已存在";
+        qDebug() << "文件已存在";
     }
     ui->textDir->setText(newPath);
     ui->textDir->setToolTip(ui->textDir->text());

@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
 
 if (POLICY CMP0071)
   cmake_policy(SET CMP0071 NEW)
@@ -58,7 +58,7 @@ add_executable(lafdup WIN32 ${LAFDUP_SRC})
 target_link_libraries(lafdup Qt5::Widgets Qt5::Core lafrpc)
 
 #查找Qt翻译工具
-find_package(Qt5 REQUIRED COMPONENTS LinguistTools REQUIRED)
+find_package(Qt5 COMPONENTS LinguistTools QUIET)
 
 # 初始化要使用的列表
 set(TS_FILES
@@ -66,15 +66,18 @@ set(TS_FILES
 )
 set(QM_FILES)
 
-# 设置翻译文件的生成路径，如果不指定就会生成在CMakeFiles的目录里
-set_source_files_properties(${TS_FILES}
-    PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/translations
-)
-# 创建翻译的最关键一步
-qt5_create_translation(QM_FILES ${TS_FILES} ${LAFDUP_SRC} OPTIONS -no-obsolete -no-ui-lines)
+# 只有在找到LinguistTools时才进行翻译相关的工作
+if(Qt5LinguistTools_FOUND)
+    # 设置翻译文件的生成路径，如果不指定就会生成在CMakeFiles的目录里
+    set_source_files_properties(${TS_FILES}
+        PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/translations
+    )
+    # 创建翻译的最关键一步
+    qt5_create_translation(QM_FILES ${TS_FILES} ${LAFDUP_SRC} OPTIONS -no-obsolete -no-ui-lines)
 
-# 添加更新翻译的目标
-add_custom_target(lupdate_task DEPENDS ${TS_FILES})
-add_custom_target(lrelease_task DEPENDS ${QM_FILES})
+    # 添加更新翻译的目标
+    add_custom_target(lupdate_task DEPENDS ${TS_FILES})
+    add_custom_target(lrelease_task DEPENDS ${QM_FILES})
+endif()
 
 

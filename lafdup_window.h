@@ -50,8 +50,8 @@ private slots:
 public slots:
     void onClipboardChanged();
 private:
-    bool outgoing(const QString &text, bool ignoreLimits);
-    bool outgoing(const QList<QUrl> urls, bool showError, bool ignoreLimits);
+    bool outgoing(const QString &text, bool force);
+    bool outgoing(const QList<QUrl> urls, bool showError);
     bool isExcelDataCopied(const QMimeData *mimeData);
     bool copyFolder(const QString &fromDir, const QString &toDir);
     void updateMyIP();

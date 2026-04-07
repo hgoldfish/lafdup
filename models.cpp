@@ -1,11 +1,10 @@
-﻿#include "models.h"
+#include "models.h"
 
 CopyPaste::CopyPaste(const Direction &direction, const QDateTime &timestamp, const QString &text)
     : direction(direction)
     , timestamp(timestamp)
     , mimeType(TextType)
     , text(text)
-    , isTextHtml(false)
 {
 }
 
@@ -17,11 +16,6 @@ CopyPaste::CopyPaste()
 QVariantMap CopyPaste::saveState()
 {
     QVariantMap state;
-    //    if (type == CopyPasteType::Incoming) {
-    //        state.insert("type", 1);
-    //    } else {
-    //        state.insert("type", 2);
-    //    }
     state.insert("timestamp", timestamp);
     state.insert("mime_type", mimeType);
     if (mimeType == TextType) {
@@ -37,17 +31,6 @@ QVariantMap CopyPaste::saveState()
 
 bool CopyPaste::restoreState(const QVariantMap &state)
 {
-    //    bool ok;
-    //    if (state.value("type").toInt(&ok) == 1) {
-    //        type = Incoming;
-    //    } else if (state.value("type").toInt(&ok) == 2) {
-    //        type = Outgoing;
-    //    } else {
-    //        return false;
-    //    }
-    //    if (!ok) {
-    //        return false;
-    //    }
     timestamp = state.value("timestamp").toDateTime();
     mimeType = state.value("mime_type").toString();
     text = state.value("text").toString();

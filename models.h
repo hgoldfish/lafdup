@@ -1,4 +1,4 @@
-﻿#ifndef LAFDUP_MODELS_H
+#ifndef LAFDUP_MODELS_H
 #define LAFDUP_MODELS_H
 
 #include <QtCore/qstring.h>
@@ -9,7 +9,6 @@
 const QString TextType = "text/plain";
 const QString BinaryType = "application/octet-stream";
 const QString ImageType = "image/png";
-const QString CompType = "comp";
 
 struct CopyPaste
 {
@@ -25,13 +24,10 @@ public:
     QString text;
     QByteArray image;
     QStringList files;
-    bool ignoreLimits;
-    bool isTextHtml;
 public:
     bool isText() const { return mimeType == TextType; }
     bool isFile() const { return mimeType == BinaryType; }
     bool isImage() const { return mimeType == ImageType; }
-    bool isComp() const { return mimeType == CompType; }
 public:
     QVariantMap saveState();
     bool restoreState(const QVariantMap &state);

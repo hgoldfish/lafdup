@@ -1,4 +1,4 @@
-﻿#ifndef LAFDUP_PEER_H
+#ifndef LAFDUP_PEER_H
 #define LAFDUP_PEER_H
 
 #include <QtCore/qset.h>
@@ -17,7 +17,7 @@ public:
 public:
     bool start();
     void stop();
-    void outgoing(const CopyPaste &copyPaste);
+    void outgoing(const CopyPaste &copyPaste, bool unlimited);
     void setPassword(QByteArray password);
     void setExtraKnownPeers(const QSet<QPair<qtng::HostAddress, quint16>> &extraKnownPeers);
     void setCacheDir(const QString &cacheDir);
@@ -42,8 +42,8 @@ private:
                               const QString &itsPeerName);
     QSharedPointer<lafrpc::Peer> handleRequestSync(QSharedPointer<qtng::SocketLike> request, qtng::DataChannelPole pole,
                                                    const QString &itsPeerName, const QString &itsAddress);
-    void _outgoingSync(CopyPaste copyPaste);
-    bool canSendContent(const CopyPaste &copyPaste);
+    void _outgoingSync(CopyPaste copyPaste, bool force);
+    bool canSendContent(const CopyPaste &copyPaste, bool force);
 
     bool findItem(const QDateTime &timestamp);
     bool findItem(const CopyPaste &currentItem);

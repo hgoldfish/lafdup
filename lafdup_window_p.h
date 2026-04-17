@@ -1,4 +1,4 @@
-﻿#ifndef LAFDUP_WINDOW_P_H
+#ifndef LAFDUP_WINDOW_P_H
 #define LAFDUP_WINDOW_P_H
 
 #include <QtCore/qdatetime.h>
@@ -73,10 +73,12 @@ private slots:
     void onOnlySendSmallFileChanged(bool checked);
     void removeSelectedPeer();
     void addPeer();
-    void onChangelanguage();
+    void changeLanguage();
 private:
     void loadSettings();
-    void appAutoRun(bool checked);
+#ifdef Q_OS_WIN
+    void setAutoStartup(bool checked);
+#endif
 private:
     Ui::ConfigureDialog *ui;
     PeerModel *peerModel;

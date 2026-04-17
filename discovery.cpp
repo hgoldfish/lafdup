@@ -1,4 +1,4 @@
-﻿#include <QtCore/qdatastream.h>
+#include <QtCore/qdatastream.h>
 #include <QtCore/qloggingcategory.h>
 #include "discovery.h"
 #include "peer.h"
@@ -219,7 +219,7 @@ void LafdupDiscovery::discovery()
             if (bs != packet.size()) {
                 qCDebug(logger) << "can not send packet to" << addr << kcpSocket->errorString();
             } else {
-                qCDebug(logger) << "send to broadcast address: " << addr.toString();
+                // qCDebug(logger) << "send to broadcast address: " << addr.toString();
             }
         }
         // prevent undefined behavior if addresses changed while broadcasting.
@@ -237,7 +237,7 @@ void LafdupDiscovery::discovery()
             if (bs != packet.size()) {
                 qCDebug(logger) << "can not send packet to" << addr << kcpSocket->errorString();
             } else {
-                qCDebug(logger) << "send to known peer: " << addr.first.toString() << ":" << addr.second;
+                //qCDebug(logger) << "send to known peer: " << addr.first.toString() << ":" << addr.second;
             }
         }
 
@@ -261,8 +261,8 @@ void LafdupDiscovery::discovery()
                 qCDebug(logger) << "can not send packet to" << extraKnownPeer.first.toString() << ":"
                                 << extraKnownPeer.second;
             } else {
-                qCDebug(logger) << "send to extra known peer: " << extraKnownPeer.first.toString() << ":"
-                                << extraKnownPeer.second;
+                //qCDebug(logger) << "send to extra known peer: " << extraKnownPeer.first.toString() << ":"
+                //                << extraKnownPeer.second;
             }
         }
         Coroutine::sleep(5.0);

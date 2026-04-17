@@ -183,7 +183,7 @@ LafdupWindow::LafdupWindow()
     connect(ui->actionSetToClipboard, SIGNAL(triggered(bool)), SLOT(setToClipboard()));
     connect(ui->actionRemove, SIGNAL(triggered(bool)), SLOT(removeCopyPaste()));
     connect(ui->actionClearAll, SIGNAL(triggered(bool)), SLOT(clearAll()));
-    // connect(ui->cbxTop, &QCheckBox::stateChanged, this, &LafdupWindow::setWindowTop);
+    connect(ui->cbxTop, &QCheckBox::stateChanged, this, &LafdupWindow::setWindowTop);
     QClipboard *clipboard = QApplication::clipboard();
     connect(clipboard, &QClipboard::dataChanged, this, &LafdupWindow::onClipboardChanged);
 
@@ -312,7 +312,7 @@ bool LafdupWindow::outgoing(const QList<QUrl> urls, bool showError)
     copyPaste.direction = CopyPaste::Outgoing;
     copyPaste.mimeType = BinaryType;
     copyPaste.files = files;
-    peer->outgoing(copyPaste, /* unlimited=*/ showError);
+    peer->outgoing(copyPaste, /* unlimited=*/showError);
     return true;
 }
 
@@ -340,12 +340,11 @@ bool LafdupWindow::isExcelDataCopied(const QMimeData *mimeData)
 {
     if (mimeData->hasFormat("text/html")) {
         QString html = mimeData->html();
-        if (html.contains("<table") || html.contains("x:str"))
+        if (html.contains("<table") || html.contains("x:str")) {
             return true;
+        }
     }
-    if (mimeData->hasFormat("application/x-qt-windows-mime;value=\"Csv\""))
-        return true;
-    return false;
+    return mimeData->hasFormat("application/x-qt-windows-mime;value=\"Csv\"");
 }
 
 bool LafdupWindow::copyFolder(const QString &fromDir, const QString &toDir)
@@ -353,9 +352,8 @@ bool LafdupWindow::copyFolder(const QString &fromDir, const QString &toDir)
     QDir sourceDir(fromDir);
     QDir targetDir(toDir);
 
-    if (!targetDir.exists()) {
-        if (!targetDir.mkdir(targetDir.absolutePath()))
-            return false;
+    if (!targetDir.exists() && !targetDir.mkdir(targetDir.absolutePath())) {
+        return false;
     }
 
     QFileInfoList fileInfoList = sourceDir.entryInfoList();
@@ -470,13 +468,17 @@ void LafdupWindow::savaImageToLocal()
 
 void LafdupWindow::setWindowTop(int state)
 {
-    if (state == Qt::Checked) {
-        setWindowFlag(Qt::WindowStaysOnTopHint, true);
-        this->show();
-    } else if (state == Qt::Unchecked) {
-        setWindowFlag(Qt::WindowStaysOnTopHint, false);
-    } else {
-        return;
+    QPoint pos = this->pos();
+    QSize size = this->size();
+    bool wasActive = this->isActiveWindow();
+    bool isTopMost = (state == Qt::Checked);
+    hide();
+    setWindowFlag(Qt::WindowStaysOnTopHint, isTopMost);
+    this->resize(size);
+    this->move(pos);
+    show();
+    if (wasActive) {
+        activateWindow();
     }
 }
 
@@ -501,7 +503,6 @@ void LafdupWindow::onClipboardChanged()
         copyPaste.image = saveImage(mimeData->imageData().value<QImage>());
         peer->outgoing(copyPaste, false);
     }
-    
 }
 
 struct DisableSyncClipboard
@@ -886,8 +887,10 @@ void ConfigureDialog::accept()
     settings.setValue("send_files_size", ui->spinSendFileSize->value());
     settings.setValue("ignore_password", ui->chkIgnorePassword->isChecked());
     settings.setValue("isMinimized", ui->chkStartMin->isChecked());
-    this->onChangelanguage();
-    appAutoRun(ui->chkAutoStart->isChecked());
+    this->changeLanguage();
+#ifdef Q_OS_WIN
+    setAutoStartup(ui->chkAutoStart->isChecked());
+#endif
     QDialog::accept();
 }
 
@@ -943,7 +946,8 @@ void ConfigureDialog::loadSettings()
     ui->chkAutoStart->setChecked(!autoRunSetting.value("lafdup").isNull());
 }
 
-void ConfigureDialog::appAutoRun(bool checked)
+#ifdef Q_OS_WIN
+void ConfigureDialog::setAutoStartup(bool checked)
 {
     QString application_name = QString::fromUtf8("lafdup");
     QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
@@ -954,6 +958,7 @@ void ConfigureDialog::appAutoRun(bool checked)
         settings.remove(application_name);
     }
 }
+#endif
 
 bool ConfigureDialog::isPasswordChanged()
 {
@@ -1015,7 +1020,7 @@ void ConfigureDialog::addPeer()
     }
 }
 
-void ConfigureDialog::onChangelanguage()
+void ConfigureDialog::changeLanguage()
 {
     int ret = ui->cbBLanguage->currentIndex();
     QString language;

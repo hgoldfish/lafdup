@@ -259,7 +259,7 @@ void LafdupPeer::_outgoingSync(CopyPaste copyPaste, bool force)
 bool LafdupPeer::canSendContent(const CopyPaste &copyPaste, bool unlimited)
 {
     if (copyPaste.mimeType == TextType) {
-        if (!unlimited && !ignorePassword && isPassword(copyPaste.text)) {
+        if (!unlimited && ignorePassword && isPassword(copyPaste.text)) {
             return false;
         }
     } else if (copyPaste.mimeType == BinaryType) {

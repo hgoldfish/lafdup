@@ -10,7 +10,6 @@ namespace Ui {
 class LafdupWindow;
 }
 class GuideDialog;
-class MessageTips;
 class CopyPasteModel;
 class LafdupWindow : public QWidget
 {
@@ -41,8 +40,6 @@ private slots:
     void removeCopyPaste();
     void clearAll();
     void sendFiles();
-    void sendFeedBackTips(QString tips);
-    void sendAction();
     void saveTextToLocal();
     void saveFilesToLocal();
     void savaImageToLocal();

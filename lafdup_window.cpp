@@ -11,6 +11,7 @@
 #include <QtWidgets/qfiledialog.h>
 #include <QtWidgets/qmenu.h>
 #include <QtCore/qstandardpaths.h>
+#include "lafrpc.h"
 #include "lafdup_window_p.h"
 #include "lafdupapplication.h"
 #include "ui_configure.h"
@@ -154,7 +155,7 @@ bool CtrlEnterListener::eventFilter(QObject *, QEvent *event)
 
 LafdupWindow::LafdupWindow()
     : ui(new Ui::LafdupWindow())
-    , peer(new LafdupPeer(lafrpc::createUuid(), LafdupPeer::getDefaultPort()))
+    , peer(new LafdupPeer(lafrpc::createUuid(), LafdupPeer::defaultPort()))
     , copyPasteModel(new CopyPasteModel())
     , trayIcon(new QSystemTrayIcon())
 {
@@ -189,8 +190,6 @@ LafdupWindow::LafdupWindow()
 
     connect(peer.data(), &LafdupPeer::stateChanged, this, &LafdupWindow::onPeerStateChanged);
     connect(peer.data(), &LafdupPeer::incoming, this, &LafdupWindow::updateClipboard);
-    connect(peer.data(), &LafdupPeer::sendFeedBack, this, &LafdupWindow::sendFeedBackTips);
-    connect(peer.data(), &LafdupPeer::sendAction, this, &LafdupWindow::sendAction);
 
     loadConfiguration(true);
     started = peer->start();
@@ -213,7 +212,7 @@ void LafdupWindow::showEvent(QShowEvent *event)
         updateMyIP();
     } else {
         ui->lblInformation->setText(
-                tr("Can not bind to port %1. Will not synchronize from other phone/pc.").arg(peer->getPort()));
+                tr("Can not bind to port %1. Will not synchronize from other phone/pc.").arg(peer->port()));
     }
     ui->txtContent->setFocus();
 }
@@ -397,17 +396,6 @@ void LafdupWindow::sendFiles()
         return;
     }
     outgoing(fileUrls, true);
-}
-
-void LafdupWindow::sendFeedBackTips(QString tips)
-{
-    MessageTips::showMessageTips(tips, this);
-}
-
-void LafdupWindow::sendAction()
-{
-    QString tipStr = tr("Start sending");
-    MessageTips::showMessageTips(tipStr, this);
 }
 
 void LafdupWindow::saveTextToLocal()
@@ -672,7 +660,7 @@ void LafdupWindow::updateMyIP()
 {
     QString text = tr("My IP Addresses:");
     text.append("\n");
-    const auto &list = peer->getAllBoundAddresses();
+    const auto &list = peer->allBoundAddresses();
     for (const QString &ip : list) {
         text.append(ip);
         text.append("\n");
@@ -683,11 +671,15 @@ void LafdupWindow::updateMyIP()
 void LafdupWindow::loadPassword()
 {
     QSettings settings;
-    const QByteArray &password = settings.value("password").toByteArray();
-    if (password.isEmpty()) {
+    const QByteArray stored = settings.value("password").toByteArray();
+    if (!LafdupApplication::hasStoredPassword(stored)) {
         setPassword();
-    } else {
-        peer->setPassword(password);
+        return;
+    }
+    const QByteArray material = LafdupApplication::loadPasswordMaterial(stored);
+    peer->setPassword(material);
+    if (!LafdupApplication::isLegacyStoredPassword(stored) && stored == material && !material.isEmpty()) {
+        settings.setValue("password", LafdupApplication::storePassword(QString::fromUtf8(material)));
     }
 }
 
@@ -701,15 +693,19 @@ void LafdupWindow::loadConfiguration(bool withPassword)
         for (int i = 0; i < knownPeers.size(); ++i) {
             HostAddress addr(knownPeers.at(i));
             if (!addr.isNull()) {
-                addresses.insert(qMakePair(addr, peer->getDefaultPort()));
+                addresses.insert(qMakePair(addr, peer->defaultPort()));
             }
         }
         peer->setExtraKnownPeers(addresses);
     }
     if (withPassword) {
-        const QByteArray &password = settings.value("password").toByteArray();
-        if (!password.isEmpty()) {
-            peer->setPassword(password);
+        const QByteArray stored = settings.value("password").toByteArray();
+        if (LafdupApplication::hasStoredPassword(stored)) {
+            const QByteArray material = LafdupApplication::loadPasswordMaterial(stored);
+            peer->setPassword(material);
+            if (!LafdupApplication::isLegacyStoredPassword(stored) && stored == material && !material.isEmpty()) {
+                settings.setValue("password", LafdupApplication::storePassword(QString::fromUtf8(material)));
+            }
         }
     }
 
@@ -791,8 +787,7 @@ void PasswordDialog::accept()
         return;
     }
     QSettings settings;
-    QByteArray salt("3.1415926535897932384626433");
-    settings.setValue("password", qtng::PBKDF2_HMAC(256, password.toUtf8(), salt));
+    settings.setValue("password", LafdupApplication::storePassword(password));
     QDialog::accept();
 }
 
@@ -877,7 +872,7 @@ void ConfigureDialog::accept()
     QSettings settings;
     settings.setValue("known_peers", peers);
     if (!password.isEmpty()) {
-        settings.setValue("password", password);
+        settings.setValue("password", LafdupApplication::storePassword(password));
     }
     settings.setValue("cache_dir", ui->txtCacheDirectory->text());
     settings.setValue("delete_files", ui->chkDeleteFiles->isChecked());
@@ -899,7 +894,11 @@ void ConfigureDialog::loadSettings()
     QSettings settings;
     const QStringList &knownPeers = settings.value("known_peers").toStringList();
     const QString &cacheDirPath = settings.value("cache_dir").toString();
-    const QString &password = settings.value("password").toString();
+    const QByteArray storedPassword = settings.value("password").toByteArray();
+    QString password;
+    if (!LafdupApplication::isLegacyStoredPassword(storedPassword)) {
+        password = QString::fromUtf8(LafdupApplication::loadPasswordMaterial(storedPassword));
+    }
     bool deleteFiles = settings.value("delete_files", true).toBool();
     bool ok;
     int deleteFilesTime = settings.value("delete_files_time", 30).toInt(&ok);
@@ -1048,97 +1047,6 @@ void ConfigureDialog::removeSelectedPeer()
     }
 }
 
-MessageTips::MessageTips(const QString &str, QWidget *partent)
-    : QWidget(partent)
-    , showStr(str)
-{
-    setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
-    this->setAttribute(Qt::WA_TranslucentBackground);
-    this->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-    this->setAttribute(Qt::WA_DeleteOnClose);
-    this->setFixedHeight(50);
-    QFontMetrics fontMetrics(lpp->font());
-    int textWidth = fontMetrics.horizontalAdvance(showStr);
-    if (textWidth > 200) {
-        this->setFixedWidth(textWidth + 50);
-    } else {
-        this->setFixedWidth(200);
-    }
-}
-
-MessageTips::~MessageTips()
-{
-    if (mtimer != nullptr) {
-        delete mtimer;
-        mtimer = nullptr;
-    }
-}
-
-void MessageTips::prepare()
-{
-    this->setWindowOpacity(opacity);
-    mtimer = new QTimer(this);  // 隐藏的定时器
-    mtimer->setTimerType(Qt::PreciseTimer);
-    connect(mtimer, &QTimer::timeout, this, &MessageTips::opacityTimer);
-    this->move(this->parentWidget()->x() + (this->parentWidget()->width()) / 2 - this->width() / 2, 10);
-    QTimer::singleShot(showTime, this, [this] { mtimer->start(closeTime); });  // 执行延时自动关闭
-}
-
-void MessageTips::setCloseTimeSpeed(int time, double speed)
-{
-    if (speed > 0 && speed <= 1) {
-        closeSpeed = speed;
-    }
-    closeTime = time;
-}
-
-void MessageTips::paintEvent(QPaintEvent *)
-{
-    QPainter painter(this);
-    painter.setBrush(QBrush(bgColor));  // 窗体的背景色
-    painter.setPen(QPen(frameColor, frameSize));  // 窗体边框的颜色和笔画大小
-    QRectF rect(0, 0, this->width(), this->height());
-    painter.drawRoundedRect(rect, 10, 10);
-    painter.setFont(lpp->font());
-    painter.setPen(QPen(textColor, frameSize));
-    painter.drawText(rect, Qt::AlignHCenter | Qt::AlignVCenter, showStr);
-}
-
-void MessageTips::opacityTimer()
-{
-    opacity = opacity - closeSpeed;
-    if (opacity <= 0) {
-        mtimer->stop();
-        this->close();
-        return;
-    } else {
-        this->setWindowOpacity(opacity);
-    }
-}
-
-void MessageTips::timerDelayShutdown()
-{
-    mtimer->start(closeTime);
-}
-
-void MessageTips::showMessageTips(QString str, QWidget *parent)
-{
-    MessageTips *mMessageTips = new MessageTips(str, parent);
-    mMessageTips->setShowTime(1500);
-    mMessageTips->prepare();
-    mMessageTips->show();
-}
-
-void MessageTips::setShowTime(int time)
-{
-    showTime = time;
-}
-
-void MessageTips::backgroundColor(QColor color)
-{
-    bgColor = color;
-}
-
 GuideDialog::GuideDialog(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::GuideDialog)
@@ -1175,7 +1083,7 @@ void GuideDialog::accept()
     QString password = ui->textPwd->text();
     QString recvFilePath = ui->textDir->text();
     QSettings settings;
-    settings.setValue("password", password);
+    settings.setValue("password", LafdupApplication::storePassword(password));
     settings.setValue("cache_dir", recvFilePath);
     QDialog::accept();
 }

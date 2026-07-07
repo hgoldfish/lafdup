@@ -37,6 +37,7 @@ set(LAFDUP_SRC
     peer.h
     peer_p.h
     discovery.h
+    discovery_p.h
     models.h
 
     peer.cpp

@@ -1,6 +1,6 @@
 #include <QtCore/qdatastream.h>
 #include <QtCore/qloggingcategory.h>
-#include "discovery.h"
+#include "discovery_p.h"
 #include "peer.h"
 
 static Q_LOGGING_CATEGORY(logger, "lafdup.discovery");
@@ -9,136 +9,49 @@ const quint16 DefaultPort = 7951;
 const quint16 MagicNumber = DefaultPort;
 const quint8 CurrentVersion = 1;
 
-LafdupKcpSocket::LafdupKcpSocket(LafdupDiscovery *parent)
-    : KcpSocket(HostAddress::IPv4Protocol)
-    , parent(parent)
-{
-}
-
-bool LafdupKcpSocket::filter(char *data, qint32 *len, HostAddress *addr, quint16 *port)
-{
-    const QByteArray &packet = QByteArray::fromRawData(data, *len);
-    if (packet.startsWith("\x1f\x0f")) {  // MagicCode
-        parent->handleDiscoveryRequest(packet, *addr, *port);
-        return true;
-    }
-    if (packet.startsWith("\xcd\x1f\x0f")) {  // packet previous version sent.
-        return true;
-    }
-    return false;
-}
-
-LafdupDiscovery::LafdupDiscovery(const QByteArray &uuid, quint16 port, LafdupPeer *parent)
+LafdupDiscoveryPrivate::LafdupDiscoveryPrivate(LafdupDiscovery *q, const QByteArray &uuid, quint16 port,
+                                             LafdupPeer *peer)
     : operations(new CoroutineGroup())
     , uuid(uuid)
-    , parent(parent)
+    , local(peer)
     , port(port)
+    , q_ptr(q)
 {
-    kcpSocket.reset(new LafdupKcpSocket(this));
-    kcpSocket->setOption(Socket::BroadcastSocketOption, true);
 }
 
-LafdupDiscovery::~LafdupDiscovery()
+LafdupDiscoveryPrivate::~LafdupDiscoveryPrivate()
 {
     delete operations;
 }
 
-bool LafdupDiscovery::start()
-{
-    if (operations->has("serve")) {
-        if (Q_UNLIKELY(kcpSocket->state() != Socket::ListeningState)) {
-            qCWarning(logger) << "invalid peer state, kcp socket is dead.";
-        }
-        if (Q_UNLIKELY(!operations->has("discovery"))) {
-            qCWarning(logger) << "invalid peer state, discovery coroutine is dead.";
-        }
-        return true;
-    }
-
-    if (!kcpSocket->bind(port)) {
-        return false;
-    }
-    kcpSocket->listen(50);
-
-    operations->spawnWithName("serve", [this] { serve(); });
-    operations->spawnWithName("discovery", [this] { discovery(); });
-    return true;
-}
-
-void LafdupDiscovery::stop()
-{
-    operations->killall();
-    kcpSocket.reset(new LafdupKcpSocket(this));
-}
-
-void LafdupDiscovery::setExtraKnownPeers(const QSet<QPair<HostAddress, quint16>> &extraKnownPeers)
-{
-    this->extraKnownPeers = extraKnownPeers;
-}
-
-QSet<QPair<HostAddress, quint16>> LafdupDiscovery::getExtraKnownPeers()
-{
-    return extraKnownPeers;
-}
-
-QSet<HostAddress> getMyIPs()
-{
-    QSet<HostAddress> addresses;
-    const auto &list = NetworkInterface::allAddresses();
-    for (const HostAddress &addr : list) {
-        addresses.insert(addr);
-    }
-    return addresses;
-}
-
-QStringList LafdupDiscovery::getAllBoundAddresses()
-{
-    QStringList addresses;
-    const auto &list = NetworkInterface::allAddresses();
-    for (const HostAddress &addr : list) {
-        if (!addr.isLoopback() && !addr.isMulticast() && addr.protocol() == HostAddress::IPv4Protocol) {
-            addresses.append(addr.toString());
-        }
-    }
-    return addresses;
-}
-
-quint16 LafdupDiscovery::getPort()
-{
-    if (port == 0) {
-        return kcpSocket->localPort();
-    } else {
-        return port;
-    }
-}
-
-quint16 LafdupDiscovery::getDefaultPort()
-{
-    return DefaultPort;
-}
-
-QByteArray LafdupDiscovery::getUuid()
-{
-    return uuid;
-}
-
-void LafdupDiscovery::serve()
+void LafdupDiscoveryPrivate::serveUdp()
 {
     while (true) {
         QSharedPointer<KcpSocket> request(kcpSocket->accept());
         if (request.isNull()) {
             return;
         }
-        parent->tryToConnectPeer(request);
+        local->tryToConnectPeer(request);
     }
 }
 
-void LafdupDiscovery::handleDiscoveryRequest(const QByteArray &packet, HostAddress addr, quint16 port)
+void LafdupDiscoveryPrivate::serveTcp()
+{
+    while (true) {
+        QSharedPointer<Socket> request(tcpServer->accept());
+        if (request.isNull()) {
+            return;
+        }
+        local->tryToConnectPeer(request);
+    }
+}
+
+void LafdupDiscoveryPrivate::handleDiscoveryRequest(const QByteArray &packet, HostAddress addr, quint16 port)
 {
     quint16 magicNumber;
     quint8 version;
     quint32 len;
-    QByteArray uuid;
+    QByteArray peerUuid;
 
     QDataStream ds(packet);
     ds >> magicNumber >> version >> len;
@@ -158,32 +71,32 @@ void LafdupDiscovery::handleDiscoveryRequest(const QByteArray &packet, HostAddre
         qCInfo(logger) << "got datagram with bad uuid length: " << len;
         return;
     }
-    uuid.resize(static_cast<int>(len));
+    peerUuid.resize(static_cast<int>(len));
 
-    ds.readRawData(uuid.data(), static_cast<int>(len));
+    ds.readRawData(peerUuid.data(), static_cast<int>(len));
     if (ds.status() != QDataStream::Ok) {
         qCInfo(logger) << "got invalid discovery packet.";
         return;
     }
 
-    if (uuid.isEmpty()) {
+    if (peerUuid.isEmpty()) {
         qCInfo(logger) << "got datagram with empty uuid.";
         return;
     }
 
-    if (uuid == this->uuid) {
+    if (peerUuid == uuid) {
         return;
     }
-    const QString &peerName = QString::fromUtf8(uuid);
+    const QString &peerName = QString::fromUtf8(peerUuid);
     knownPeers.insert(peerName, qMakePair(addr, port));
-    if (parent->hasPeer(peerName)) {
+    if (local->hasPeer(peerName)) {
         return;
     }
-    if (parent->hasPeer(addr, port)) {
+    if (local->hasPeer(addr, port)) {
         return;
     }
 
-    parent->tryToConnectPeer(peerName, addr, port);
+    local->tryToConnectPeer(peerName, addr, port);
 }
 
 static QSet<HostAddress> allBroadcastAddresses()
@@ -203,7 +116,7 @@ static QSet<HostAddress> allBroadcastAddresses()
     return addresses;
 }
 
-void LafdupDiscovery::discovery()
+void LafdupDiscoveryPrivate::discovery()
 {
     QByteArray packet;
     QDataStream ds(&packet, QIODevice::WriteOnly);
@@ -223,14 +136,14 @@ void LafdupDiscovery::discovery()
             }
         }
         // prevent undefined behavior if addresses changed while broadcasting.
-        QHash<QString, QPair<HostAddress, quint16>> addresses = this->knownPeers;
+        QHash<QString, QPair<HostAddress, quint16>> addresses = knownPeers;
         const auto &list = addresses.keys();
         for (const QString &peerName : list) {
             const QPair<HostAddress, quint16> &addr = addresses.value(peerName);
-            if (parent->hasPeer(peerName)) {
+            if (local->hasPeer(peerName)) {
                 continue;
             }
-            if (parent->hasPeer(addr.first, addr.second)) {
+            if (local->hasPeer(addr.first, addr.second)) {
                 continue;
             }
             qint32 bs = kcpSocket->udpSend(packet, addr.first, addr.second);
@@ -242,7 +155,7 @@ void LafdupDiscovery::discovery()
         }
 
         // prevent undefined behavior if addresses changed while broadcasting.
-        for (const QPair<HostAddress, quint16> &extraKnownPeer : qAsConst(this->extraKnownPeers)) {
+        for (const QPair<HostAddress, quint16> &extraKnownPeer : qAsConst(extraKnownPeers)) {
             bool found = false;
             for (const auto &value : qAsConst(knownPeers)) {
                 if (value == extraKnownPeer) {
@@ -253,7 +166,7 @@ void LafdupDiscovery::discovery()
             if (found) {
                 continue;
             }
-            if (parent->hasPeer(extraKnownPeer.first, extraKnownPeer.second)) {
+            if (local->hasPeer(extraKnownPeer.first, extraKnownPeer.second)) {
                 continue;
             }
             qint32 bs = kcpSocket->udpSend(packet, extraKnownPeer.first, extraKnownPeer.second);
@@ -268,3 +181,127 @@ void LafdupDiscovery::discovery()
         Coroutine::sleep(5.0);
     }
 }
+
+LafdupKcpSocket::LafdupKcpSocket(LafdupDiscoveryPrivate *d)
+    : KcpSocket(HostAddress::IPv4Protocol)
+    , d(d)
+{
+}
+
+bool LafdupKcpSocket::filter(char *data, qint32 *len, HostAddress *addr, quint16 *port)
+{
+    const QByteArray &packet = QByteArray::fromRawData(data, *len);
+    if (packet.startsWith("\x1f\x0f")) {  // MagicCode
+        d->handleDiscoveryRequest(packet, *addr, *port);
+        return true;
+    }
+    if (packet.startsWith("\xcd\x1f\x0f")) {  // packet previous version sent.
+        return true;
+    }
+    return false;
+}
+
+LafdupDiscovery::LafdupDiscovery(const QByteArray &uuid, quint16 port, LafdupPeer *parent)
+    : d_ptr(new LafdupDiscoveryPrivate(this, uuid, port, parent))
+{
+    stop();
+}
+
+LafdupDiscovery::~LafdupDiscovery()
+{
+    stop();
+}
+
+bool LafdupDiscovery::start()
+{
+    Q_D(LafdupDiscovery);
+    if (d->operations->has("serve_udp")) {
+        if (Q_UNLIKELY(d->kcpSocket->state() != Socket::ListeningState)) {
+            qCWarning(logger) << "invalid peer state, kcp socket is dead.";
+        }
+        if (Q_UNLIKELY(!d->operations->has("discovery"))) {
+            qCWarning(logger) << "invalid peer state, discovery coroutine is dead.";
+        }
+        if (Q_UNLIKELY(!d->operations->has("serve_tcp"))) {
+            qCWarning(logger) << "invalid peer state, tcp serveUdp coroutine is dead.";
+        }
+        return true;
+    }
+
+    if (!d->kcpSocket->bind(d->port)) {
+        qCWarning(logger) << "can not bind kcp server on port" << d->port;
+        return false;
+    }
+    if (!d->kcpSocket->listen(50)) {
+        qCWarning(logger) << "can not listen kcp server on port" << d->port;
+        return false;
+    }
+
+    if (!d->tcpServer->bind(d->port)) {
+        qCWarning(logger) << "can not bind tcp server on port" << d->port;
+        return false;
+    }
+    if (!d->tcpServer->listen(50)) {
+        qCWarning(logger) << "can not listen tcp server on port" << d->port;
+        return false;
+    }
+
+    d->operations->spawnWithName("serve_udp", [d] { d->serveUdp(); });
+    d->operations->spawnWithName("serve_tcp", [d] { d->serveTcp(); });
+    d->operations->spawnWithName("discovery", [d] { d->discovery(); });
+    return true;
+}
+
+void LafdupDiscovery::stop()
+{
+    Q_D(LafdupDiscovery);
+    d->operations->killall();
+    d->kcpSocket.reset(new LafdupKcpSocket(d));
+    d->kcpSocket->setOption(Socket::BroadcastSocketOption, true);
+    d->tcpServer.reset(new Socket(HostAddress::IPv4Protocol));
+}
+
+void LafdupDiscovery::setExtraKnownPeers(const QSet<QPair<HostAddress, quint16>> &extraKnownPeers)
+{
+    Q_D(LafdupDiscovery);
+    d->extraKnownPeers = extraKnownPeers;
+}
+
+QSet<QPair<HostAddress, quint16>> LafdupDiscovery::extraKnownPeers() const
+{
+    Q_D(const LafdupDiscovery);
+    return d->extraKnownPeers;
+}
+
+QStringList LafdupDiscovery::allBoundAddresses()
+{
+    QStringList addresses;
+    const auto &list = NetworkInterface::allAddresses();
+    for (const HostAddress &addr : list) {
+        if (!addr.isLoopback() && !addr.isMulticast() && addr.protocol() == HostAddress::IPv4Protocol) {
+            addresses.append(addr.toString());
+        }
+    }
+    return addresses;
+}
+
+quint16 LafdupDiscovery::port()
+{
+    Q_D(LafdupDiscovery);
+    if (d->port == 0) {
+        return d->kcpSocket->localPort();
+    }
+    return d->port;
+}
+
+quint16 LafdupDiscovery::defaultPort()
+{
+    return DefaultPort;
+}
+
+QByteArray LafdupDiscovery::uuid()
+{
+    Q_D(LafdupDiscovery);
+    return d->uuid;
+}
+

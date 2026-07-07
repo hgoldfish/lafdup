@@ -2,6 +2,7 @@
 #include <QtCore/qsettings.h>
 #include <QtCore/qscopedvaluerollback.h>
 #include "discovery.h"
+#include "lafdupapplication.h"
 #include "peer_p.h"
 
 static Q_LOGGING_CATEGORY(logger, "lafdup.peer") using namespace qtng;
@@ -17,7 +18,7 @@ bool LafdupRemoteStub::pasteText(const QDateTime &timestamp, const QString &text
     if (!timestamp.isValid() || text.isEmpty()) {
         throw RpcRemoteException(tr("The time is wrong or the content is empty"));
     }
-    if (parent->findItem(timestamp)) {
+    if (parent->d_func()->findItem(timestamp)) {
         throw RpcRemoteException(tr("The same content is sent repeatedly"));
     }
     CopyPaste item;
@@ -25,7 +26,7 @@ bool LafdupRemoteStub::pasteText(const QDateTime &timestamp, const QString &text
     item.timestamp = timestamp;
     item.mimeType = TextType;
     item.text = text;
-    parent->items.prepend(item);
+    parent->d_func()->items.prepend(item);
     QPointer<LafdupPeer> peer(parent);
     callInEventLoopAsync([peer, item] {
         if (!peer.isNull()) {
@@ -37,13 +38,13 @@ bool LafdupRemoteStub::pasteText(const QDateTime &timestamp, const QString &text
 
 bool LafdupRemoteStub::pasteFiles(const QDateTime &timestamp, QSharedPointer<RpcDir> rpcDir)
 {
-    if (parent->findItem(timestamp) || rpcDir.isNull() || !rpcDir->isValid()) {
+    if (parent->d_func()->findItem(timestamp) || rpcDir.isNull() || !rpcDir->isValid()) {
         throw RpcRemoteException(tr("The local file to send could not be found"));
     }
-    if (parent->cacheDir.isEmpty()) {
+    if (parent->d_func()->cacheDir.isEmpty()) {
         throw RpcRemoteException(tr("The storage path for the other party is empty"));
     }
-    QDir cacheDir(parent->cacheDir);
+    QDir cacheDir(parent->d_func()->cacheDir);
     if (!cacheDir.isReadable()) {
         throw RpcRemoteException(tr("The storage path given by the other party is invalid"));
     }
@@ -67,14 +68,14 @@ bool LafdupRemoteStub::pasteFiles(const QDateTime &timestamp, QSharedPointer<Rpc
         fullPaths.append(destDir.absoluteFilePath(filePath));
     }
     item.files = fullPaths;
-    parent->items.prepend(item);
+    parent->d_func()->items.prepend(item);
     QPointer<LafdupPeer> parentRef(parent);
     callInEventLoopAsync([parentRef, item] {
         if (!parentRef.isNull()) {
             emit parentRef->incoming(item);
         }
     });
-    parent->writeInformation(destDir);
+    parent->d_func()->writeInformation(destDir);
     return true;
 }
 
@@ -83,7 +84,7 @@ bool LafdupRemoteStub::pasteImage(const QDateTime &timestamp, QSharedPointer<Rpc
     if (!timestamp.isValid() || image.isNull() || image->name().isEmpty()) {
         throw RpcRemoteException(tr("The local file to send could not be found"));
     }
-    if (parent->findItem(timestamp)) {
+    if (parent->d_func()->findItem(timestamp)) {
         throw RpcRemoteException(tr("The same content is sent repeatedly"));
     }
     QByteArray imageData;
@@ -96,7 +97,7 @@ bool LafdupRemoteStub::pasteImage(const QDateTime &timestamp, QSharedPointer<Rpc
     item.timestamp = timestamp;
     item.mimeType = ImageType;
     item.image = imageData;
-    parent->items.prepend(item);
+    parent->d_func()->items.prepend(item);
     QPointer<LafdupPeer> parentRef(parent);
     callInEventLoopAsync([parentRef, item] {
         if (!parentRef.isNull()) {
@@ -117,35 +118,21 @@ QDateTime LafdupRemoteStub::getCurrentTime()
 }
 
 LafdupPeer::LafdupPeer(const QByteArray &uuid, quint16 port)
-    : stub(new LafdupRemoteStub(this))
-    , deleteFilesTime(5)
-    , sendFilesSize(10.0)
-    , ignorePassword(false)
-    , cleaningFiles(false)
-    , operations(new CoroutineGroup())
+    : d_ptr(new LafdupPeerPrivate(this, uuid, port))
 {
-    lafrpc::registerClass<CopyPaste>();
-    rpc = Rpc::builder(MessagePack).myPeerName(uuid).create();
-    Q_ASSERT(!rpc.isNull());
-    rpc->registerInstance(stub, "lafdup");
-    discovery.reset(new LafdupDiscovery(uuid, port, this));
 }
 
 LafdupPeer::~LafdupPeer()
 {
-    delete operations;
 }
 
 bool LafdupPeer::start()
 {
-    if (!discovery->start()) {
+    Q_D(LafdupPeer);
+    if (!d->discovery->start()) {
         return false;
     }
-    const QString &serverAddress = QStringLiteral("tcp://0.0.0.0:%1").arg(discovery->getPort());
-    if (!rpc->startServer(serverAddress, false)) {
-        return false;
-    }
-    operations->spawnWithName("clean_files", [this] { cleanFiles(); });
+    d->operations->spawnWithName("clean_files", [d] { d->cleanFiles(); });
     QPointer<LafdupPeer> self(this);
     callInEventLoopAsync([self] {
         if (!self.isNull()) {
@@ -157,16 +144,103 @@ bool LafdupPeer::start()
 
 void LafdupPeer::stop()
 {
-    const QString &serverAddress = QStringLiteral("tcp://0.0.0.0:%1").arg(discovery->getPort());
-    rpc->stopServer(serverAddress);
-    discovery->stop();
-    operations->kill("clean_files");
+    Q_D(LafdupPeer);
+    d->discovery->stop();
+    d->operations->kill("clean_files");
     QPointer<LafdupPeer> self(this);
     callInEventLoopAsync([self] {
         if (!self.isNull()) {
             emit self->stateChanged(false);
         }
     });
+}
+
+void LafdupPeer::outgoing(const CopyPaste &copyPaste, bool unlimited)
+{
+    Q_D(LafdupPeer);
+    d->outgoing(copyPaste, unlimited);
+}
+
+void LafdupPeer::setPassword(QByteArray password)
+{
+    Q_D(LafdupPeer);
+    d->setPassword(password);
+}
+
+void LafdupPeer::setExtraKnownPeers(const QSet<QPair<HostAddress, quint16>> &extraKnownPeers)
+{
+    Q_D(LafdupPeer);
+    d->discovery->setExtraKnownPeers(extraKnownPeers);
+}
+
+void LafdupPeer::setCacheDir(const QString &cacheDir)
+{
+    Q_D(LafdupPeer);
+    d->setCacheDir(cacheDir);
+}
+
+void LafdupPeer::setDeleteFilesTime(int minutes)
+{
+    Q_D(LafdupPeer);
+    if (minutes >= 0) {
+        d->deleteFilesTime = minutes;
+    } else {
+        d->deleteFilesTime = 0;
+    }
+}
+
+void LafdupPeer::setSendFilesSize(float mb)
+{
+    Q_D(LafdupPeer);
+    if (mb < 0) {
+        d->sendFilesSize = 0.0;
+    } else {
+        d->sendFilesSize = mb;
+    }
+}
+
+void LafdupPeer::setIgnorePassword(bool ignorePassword)
+{
+    Q_D(LafdupPeer);
+    d->ignorePassword = ignorePassword;
+}
+
+QStringList LafdupPeer::allBoundAddresses()
+{
+    Q_D(LafdupPeer);
+    return d->discovery->allBoundAddresses();
+}
+
+quint16 LafdupPeer::port()
+{
+    Q_D(LafdupPeer);
+    return d->discovery->port();
+}
+
+quint16 LafdupPeer::defaultPort()
+{
+    return LafdupDiscovery::defaultPort();
+}
+
+LafdupPeerPrivate::LafdupPeerPrivate(LafdupPeer *q, const QByteArray &uuid, quint16 port)
+    : stub(new LafdupRemoteStub(q))
+    , deleteFilesTime(5)
+    , sendFilesSize(10.0)
+    , ignorePassword(false)
+    , cleaningFiles(false)
+    , operations(new CoroutineGroup())
+    , q_ptr(q)
+{
+    lafrpc::registerClass<CopyPaste>();
+    rpc = Rpc::builder(MessagePack).myPeerName(uuid).create();
+    Q_ASSERT(!rpc.isNull());
+    rpc->registerInstance(stub, "lafdup");
+    discovery.reset(new LafdupDiscovery(uuid, port, q));
+}
+
+LafdupPeerPrivate::~LafdupPeerPrivate()
+{
+    delete operations;
 }
 
 struct PopulateResult
@@ -211,33 +285,22 @@ static bool isPassword(const QString &text)
     return true;
 }
 
-void LafdupPeer::_outgoingSync(CopyPaste copyPaste, bool force)
+void LafdupPeerPrivate::_outgoingSync(CopyPaste copyPaste, bool force)
 {
     if (!canSendContent(copyPaste, force)) {
         return;
     }
     const QList<QString> peerList = rpc->getAllPeerNames();
     QSet<QString> peerNames(peerList.begin(), peerList.end());
-    if (peerNames.isEmpty()) {
-        emit sendFeedBack(tr("Failed to send, no one accepted"));
-        return;
-    }
-    emit sendAction();
-    QList<QSharedPointer<Coroutine>> coroutines;
+    CoroutineGroup workers;
     QList<QSharedPointer<QString>> errorStrings;
     for (const QString &peerName : qAsConst(peerNames)) {
         QSharedPointer<Peer> peer = rpc->get(peerName);
         QSharedPointer<QString> errorString(new QString());
-        QSharedPointer<Coroutine> c = operations->spawn(
-                [this, peer, copyPaste, errorString] { sendContentToPeer(peer, copyPaste, errorString.data()); });
-        if (c) {
-            coroutines.append(c);
-            errorStrings.append(errorString);
-        }
+        workers.spawn([this, peer, copyPaste, errorString] { sendContentToPeer(peer, copyPaste, errorString.data()); });
+        errorStrings.append(errorString);
     }
-    for (QSharedPointer<Coroutine> c : coroutines) {
-        c->join();
-    }
+    workers.joinall();
     QStringList errors;
     for (const QSharedPointer<QString> &errorString : qAsConst(errorStrings)) {
         if (errorString->isEmpty()) {
@@ -246,17 +309,14 @@ void LafdupPeer::_outgoingSync(CopyPaste copyPaste, bool force)
         errors.append(*errorString);
     }
     if (errors.isEmpty()) {
-        emit sendFeedBack(tr("Sent successfully"));
         if (!findItem(copyPaste)) {
             items.prepend(copyPaste);
-            emit incoming(copyPaste);
+            emit q_ptr->incoming(copyPaste);
         }
-    } else {
-        emit sendFeedBack(errors.join("\n"));
     }
 }
 
-bool LafdupPeer::canSendContent(const CopyPaste &copyPaste, bool unlimited)
+bool LafdupPeerPrivate::canSendContent(const CopyPaste &copyPaste, bool unlimited)
 {
     if (copyPaste.mimeType == TextType) {
         if (!unlimited && ignorePassword && isPassword(copyPaste.text)) {
@@ -289,7 +349,7 @@ bool LafdupPeer::canSendContent(const CopyPaste &copyPaste, bool unlimited)
     return true;
 }
 
-void LafdupPeer::outgoing(const CopyPaste &copyPaste, bool unlimited)
+void LafdupPeerPrivate::outgoing(const CopyPaste &copyPaste, bool unlimited)
 {
     if (findItem(copyPaste.timestamp)) {
         return;
@@ -308,9 +368,10 @@ QString makeAddress(const QString &prefix, const HostAddress &addr, quint16 port
 
 bool LafdupPeer::hasPeer(const HostAddress &remoteHost, quint16 port)
 {
+    Q_D(const LafdupPeer);
     const QString &kcpAddress = makeAddress("kcp", remoteHost, port);
     const QString &tcpAddress = makeAddress("tcp", remoteHost, port);
-    for (const QSharedPointer<Peer> &peer : static_cast<const QList<QSharedPointer<Peer>>>(rpc->getAllPeers())) {
+    for (const QSharedPointer<Peer> &peer : static_cast<const QList<QSharedPointer<Peer>>>(d->rpc->getAllPeers())) {
         if (peer->address() == kcpAddress || peer->address() == tcpAddress) {
             return true;
         }
@@ -320,13 +381,15 @@ bool LafdupPeer::hasPeer(const HostAddress &remoteHost, quint16 port)
 
 bool LafdupPeer::hasPeer(const QString &peerName)
 {
-    return !rpc->get(peerName).isNull();
+    Q_D(const LafdupPeer);
+    return !d->rpc->get(peerName).isNull();
 }
 
 void LafdupPeer::tryToConnectPeer(QString itsPeerName, HostAddress remoteHost, quint16 port)
 {
-    operations->spawn([this, itsPeerName, remoteHost, port] {
-        for (QSharedPointer<Peer> oldPeer : static_cast<const QList<QSharedPointer<Peer>>>(rpc->getAll(itsPeerName))) {
+    Q_D(LafdupPeer);
+    d->operations->spawn([this, d, itsPeerName, remoteHost, port] {
+        for (QSharedPointer<Peer> oldPeer : static_cast<const QList<QSharedPointer<Peer>>>(d->rpc->getAll(itsPeerName))) {
             if (!oldPeer.isNull()) {
                 try {
                     oldPeer->call("lafdup.ping");
@@ -337,10 +400,10 @@ void LafdupPeer::tryToConnectPeer(QString itsPeerName, HostAddress remoteHost, q
             }
         }
         const QString &tcpAddress = makeAddress("tcp", remoteHost, port);
-        if (connectingPeers.contains(tcpAddress)) {
+        if (d->connectingPeers.contains(tcpAddress)) {
             return;
         }
-        connectingPeers.insert(tcpAddress);
+        d->connectingPeers.insert(tcpAddress);
 
         QSharedPointer<Peer> peer;
         try {
@@ -353,9 +416,9 @@ void LafdupPeer::tryToConnectPeer(QString itsPeerName, HostAddress remoteHost, q
                     peer.clear();
                 }
             }
-            connectingPeers.remove(tcpAddress);
+            d->connectingPeers.remove(tcpAddress);
         } catch (TimeoutException &) {
-            connectingPeers.remove(tcpAddress);
+            d->connectingPeers.remove(tcpAddress);
             // pass and go on.
         }
 
@@ -364,10 +427,10 @@ void LafdupPeer::tryToConnectPeer(QString itsPeerName, HostAddress remoteHost, q
         }
 
         const QString &kcpAddress = makeAddress("kcp", remoteHost, port);
-        if (connectingPeers.contains(kcpAddress)) {
+        if (d->connectingPeers.contains(kcpAddress)) {
             return;
         }
-        connectingPeers.insert(kcpAddress);
+        d->connectingPeers.insert(kcpAddress);
         try {
             Timeout timeout(5.0);
             QSharedPointer<KcpSocket> kcpSocket(new KcpSocket(HostAddress::IPv4Protocol));
@@ -375,9 +438,9 @@ void LafdupPeer::tryToConnectPeer(QString itsPeerName, HostAddress remoteHost, q
             if (kcpSocket->connect(remoteHost, port)) {
                 handleKcpRequestSync(kcpSocket, PositivePole, itsPeerName);
             }
-            connectingPeers.remove(kcpAddress);
+            d->connectingPeers.remove(kcpAddress);
         } catch (...) {
-            connectingPeers.remove(kcpAddress);
+            d->connectingPeers.remove(kcpAddress);
             throw;
         }
     });
@@ -385,7 +448,19 @@ void LafdupPeer::tryToConnectPeer(QString itsPeerName, HostAddress remoteHost, q
 
 void LafdupPeer::tryToConnectPeer(QSharedPointer<qtng::KcpSocket> request)
 {
-    operations->spawn([this, request] { handleKcpRequestSync(request, NegativePole, QString()); });
+    Q_D(LafdupPeer);
+    qCDebug(logger) << "try to connect peer via kcp:" << request->peerAddress() << request->peerPort();
+    const QString &address = makeAddress("kcp", request->peerAddress(), request->peerPort());
+    d->operations->spawn([this, d, request, address] { handleKcpRequestSync(request, NegativePole, address); });
+}
+
+void LafdupPeer::tryToConnectPeer(QSharedPointer<qtng::Socket> request)
+{
+    Q_D(LafdupPeer);
+    const QString &address = makeAddress("tcp", request->peerAddress(), request->peerPort());
+    d->operations->spawn([this, d, request, address] {
+        handleRequestSync(asSocketLike(request), NegativePole, QString(), address);
+    });
 }
 
 void LafdupPeer::handleKcpRequestSync(QSharedPointer<qtng::KcpSocket> request, DataChannelPole pole,
@@ -400,19 +475,23 @@ void LafdupPeer::handleKcpRequestSync(QSharedPointer<qtng::KcpSocket> request, D
 QSharedPointer<Peer> LafdupPeer::handleRequestSync(QSharedPointer<qtng::SocketLike> request, qtng::DataChannelPole pole,
                                                    const QString &itsPeerName, const QString &itsAddress)
 {
+    Q_D(LafdupPeer);
     QSharedPointer<SocketChannel> channel;
-    if (!cipher.isNull()) {
-        QSharedPointer<SocketLike> encryptedChannel = encrypted(cipher, request);
+    if (!d->cipher.isNull()) {
+        QSharedPointer<SocketLike> encryptedChannel = encrypted(d->cipher, request);
         channel.reset(new SocketChannel(encryptedChannel, pole));
     } else {
         channel.reset(new SocketChannel(request, pole));
+    }
+    if (!itsAddress.startsWith("kcp")) {
+        channel->setKeepaliveTimeout(30);
     }
     QSharedPointer<Peer> peer;
     try {
         qtng::Timeout timeout(5.0);
         Q_UNUSED(timeout);
         qCDebug(logger) << "got kcp peer:" << itsAddress << pole;
-        peer = rpc->preparePeer(channel, itsPeerName, itsAddress);
+        peer = d->rpc->preparePeer(channel, itsPeerName, itsAddress);
         qCDebug(logger) << "got rpc peer:" << !peer.isNull();
     } catch (TimeoutException &) {
         qCDebug(logger) << "got rpc peer timeout:" << false;
@@ -420,18 +499,19 @@ QSharedPointer<Peer> LafdupPeer::handleRequestSync(QSharedPointer<qtng::SocketLi
     return peer;
 }
 
-void LafdupPeer::setExtraKnownPeers(const QSet<QPair<HostAddress, quint16>> &extraKnownPeers)
-{
-    discovery->setExtraKnownPeers(extraKnownPeers);
-}
-
-void LafdupPeer::setPassword(QByteArray password)
+void LafdupPeerPrivate::setPassword(QByteArray password)
 {
     operations->spawn([this, password] {
+        if (password.isEmpty()) {
+            cipher.clear();
+            for (QSharedPointer<Peer> peer : static_cast<const QList<QSharedPointer<Peer>>>(rpc->getAllPeers())) {
+                peer->close();
+            }
+            return;
+        }
         cipher.reset(new Cipher(Cipher::AES256, Cipher::CFB, Cipher::Encrypt));
-        QByteArray salt("3.14159265358979323846");
-        cipher->setPassword(password, salt);
-        if (!cipher->isValid()) {
+        if (!cipher->setPassword(password, LafdupApplication::linkLayerSalt())) {
+            cipher.clear();
             return;
         }
         for (QSharedPointer<Peer> peer : static_cast<const QList<QSharedPointer<Peer>>>(rpc->getAllPeers())) {
@@ -440,56 +520,18 @@ void LafdupPeer::setPassword(QByteArray password)
     });
 }
 
-void LafdupPeer::setCacheDir(const QString &cacheDir)
+void LafdupPeerPrivate::setCacheDir(const QString &cacheDir)
 {
     if (!this->cacheDir.isEmpty() && this->cacheDir != cacheDir) {
-        QDir cacheDir(this->cacheDir);
-        if (cacheDir.isReadable()) {
-            operations->spawn([this, cacheDir] { _cleanFiles(cacheDir, true); });
+        QDir oldCacheDir(this->cacheDir);
+        if (oldCacheDir.isReadable()) {
+            operations->spawn([this, oldCacheDir] { _cleanFiles(oldCacheDir, true); });
         }
     }
     this->cacheDir = cacheDir;
 }
 
-void LafdupPeer::setDeleteFilesTime(int minutes)
-{
-    if (minutes >= 0) {
-        this->deleteFilesTime = minutes;
-    } else {
-        this->deleteFilesTime = 0;
-    }
-}
-
-void LafdupPeer::setSendFilesSize(float mb)
-{
-    if (mb < 0) {
-        this->sendFilesSize = 0.0;
-    } else {
-        this->sendFilesSize = mb;
-    }
-}
-
-void LafdupPeer::setIgnorePassword(bool ignorePassword)
-{
-    this->ignorePassword = ignorePassword;
-}
-
-QStringList LafdupPeer::getAllBoundAddresses()
-{
-    return discovery->getAllBoundAddresses();
-}
-
-quint16 LafdupPeer::getPort()
-{
-    return discovery->getPort();
-}
-
-quint16 LafdupPeer::getDefaultPort()
-{
-    return LafdupDiscovery::getDefaultPort();
-}
-
-bool LafdupPeer::findItem(const QDateTime &timestamp)
+bool LafdupPeerPrivate::findItem(const QDateTime &timestamp)
 {
     for (const CopyPaste &item : qAsConst(items)) {
         if (qAbs(item.timestamp.msecsTo(timestamp)) <= 50) {
@@ -499,7 +541,7 @@ bool LafdupPeer::findItem(const QDateTime &timestamp)
     return false;
 }
 
-bool LafdupPeer::findItem(const CopyPaste &currentItem)
+bool LafdupPeerPrivate::findItem(const CopyPaste &currentItem)
 {
     for (const CopyPaste &item : qAsConst(items)) {
         if (item.text == currentItem.text && item.image == currentItem.image && item.files == currentItem.files
@@ -510,7 +552,7 @@ bool LafdupPeer::findItem(const CopyPaste &currentItem)
     return false;
 }
 
-void LafdupPeer::writeInformation(const QDir destDir)
+void LafdupPeerPrivate::writeInformation(const QDir destDir)
 {
     const QString &iniFilePath = destDir.filePath("lafdup.ini");
     QSettings settings(iniFilePath, QSettings::IniFormat);
@@ -519,7 +561,7 @@ void LafdupPeer::writeInformation(const QDir destDir)
     settings.setValue("created", QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"));
 }
 
-void LafdupPeer::cleanFiles()
+void LafdupPeerPrivate::cleanFiles()
 {
     while (true) {
         if (this->cacheDir.isEmpty()) {
@@ -540,7 +582,7 @@ void LafdupPeer::cleanFiles()
     }
 }
 
-void LafdupPeer::_cleanFiles(const QDir &dir, bool cleanAll)
+void LafdupPeerPrivate::_cleanFiles(const QDir &dir, bool cleanAll)
 {
     if (!cleanAll && deleteFilesTime == 0) {
         return;
@@ -585,7 +627,7 @@ void LafdupPeer::_cleanFiles(const QDir &dir, bool cleanAll)
     }
 }
 
-bool LafdupPeer::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const CopyPaste &copyPaste, QString *errorString)
+bool LafdupPeerPrivate::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const CopyPaste &copyPaste, QString *errorString)
 {
     float seconds = 20.0;
     if (copyPaste.mimeType == BinaryType) {

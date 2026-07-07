@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     sema.release();
 
     QSettings *settings = new QSettings;
-    if (settings->value("password").toString().isEmpty()) {
+    if (!LafdupApplication::hasStoredPassword(settings->value("password").toByteArray())) {
         GuideDialog guide;
         guide.show();
         int result = guide.exec();

@@ -450,8 +450,8 @@ void LafdupPeer::tryToConnectPeer(QSharedPointer<qtng::KcpSocket> request)
 {
     Q_D(LafdupPeer);
     qCDebug(logger) << "try to connect peer via kcp:" << request->peerAddress() << request->peerPort();
-    const QString &address = makeAddress("kcp", request->peerAddress(), request->peerPort());
-    d->operations->spawn([this, d, request, address] { handleKcpRequestSync(request, NegativePole, address); });
+    // Accept side must not expect a peer name; remote UUID comes from preparePeer().
+    d->operations->spawn([this, d, request] { handleKcpRequestSync(request, NegativePole, QString()); });
 }
 
 void LafdupPeer::tryToConnectPeer(QSharedPointer<qtng::Socket> request)

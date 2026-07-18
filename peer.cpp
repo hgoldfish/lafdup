@@ -38,7 +38,10 @@ bool LafdupRemoteStub::pasteText(const QDateTime &timestamp, const QString &text
 
 bool LafdupRemoteStub::pasteFiles(const QDateTime &timestamp, QSharedPointer<RpcDir> rpcDir)
 {
-    if (parent->d_func()->findItem(timestamp) || rpcDir.isNull() || !rpcDir->isValid()) {
+    if (parent->d_func()->findItem(timestamp)) {
+        throw RpcRemoteException(tr("The same content is sent repeatedly"));
+    }
+    if (rpcDir.isNull() || !rpcDir->isValid()) {
         throw RpcRemoteException(tr("The local file to send could not be found"));
     }
     if (parent->d_func()->cacheDir.isEmpty()) {
@@ -48,7 +51,12 @@ bool LafdupRemoteStub::pasteFiles(const QDateTime &timestamp, QSharedPointer<Rpc
     if (!cacheDir.isReadable()) {
         throw RpcRemoteException(tr("The storage path given by the other party is invalid"));
     }
-    const QString &subdir = timestamp.toString("yyyyMMddHHmmss");
+    // Include milliseconds so two sends in the same second do not collide.
+    // Dedup window is 50ms, but directory names used to be second-precision only.
+    QString subdir = timestamp.toString(QStringLiteral("yyyyMMddHHmmsszzz"));
+    if (cacheDir.exists(subdir)) {
+        subdir += QLatin1Char('_') + QString::number(QDateTime::currentMSecsSinceEpoch());
+    }
     if (!cacheDir.mkdir(subdir)) {
         throw RpcRemoteException(tr("Unable to create a folder on the other side to store files"));
     }
@@ -313,6 +321,8 @@ void LafdupPeerPrivate::_outgoingSync(CopyPaste copyPaste, bool force)
             items.prepend(copyPaste);
             emit q_ptr->incoming(copyPaste);
         }
+    } else {
+        qCWarning(logger) << "send content failed:" << errors.join(QStringLiteral("; "));
     }
 }
 
@@ -662,7 +672,7 @@ bool LafdupPeerPrivate::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, con
         } catch (TimeoutException &e) {
             *errorString = e.what();
         }
-        t->kill();
+        t->join();
     } else if (copyPaste.mimeType == ImageType) {
         QByteArray imageData = copyPaste.image;
         QSharedPointer<RpcFile> rpcFile(new RpcFile());
@@ -678,7 +688,7 @@ bool LafdupPeerPrivate::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, con
             *errorString = e.what();
             return false;
         }
-        t->kill();
+        t->join();
     }
     return result;
 }

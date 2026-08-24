@@ -153,9 +153,23 @@ bool CtrlEnterListener::eventFilter(QObject *, QEvent *event)
     return false;
 }
 
+quint16 LafdupWindow::portFromEnvironment(quint16 defaultPort)
+{
+    const QByteArray env = qgetenv("LAFDUP_PORT");
+    if (env.isEmpty()) {
+        return defaultPort;
+    }
+    bool ok = false;
+    const int port = env.toInt(&ok);
+    if (ok && port > 0 && port <= 65535) {
+        return static_cast<quint16>(port);
+    }
+    return defaultPort;
+}
+
 LafdupWindow::LafdupWindow()
     : ui(new Ui::LafdupWindow())
-    , peer(new LafdupPeer(lafrpc::createUuid(), LafdupPeer::defaultPort()))
+    , peer(new LafdupPeer(lafrpc::createUuid(), portFromEnvironment(LafdupPeer::defaultPort())))
     , copyPasteModel(new CopyPasteModel())
     , trayIcon(new QSystemTrayIcon())
 {
@@ -192,6 +206,26 @@ LafdupWindow::LafdupWindow()
     connect(peer.data(), &LafdupPeer::incoming, this, &LafdupWindow::updateClipboard);
 
     loadConfiguration(true);
+    const QByteArray envPeers = qgetenv("LAFDUP_PEERS");
+    if (!envPeers.isEmpty()) {
+        QSet<QPair<HostAddress, quint16>> addresses;
+        const QList<QByteArray> &entries = envPeers.split(',');
+        for (const QByteArray &entry : entries) {
+            const QList<QByteArray> &hp = entry.split(':');
+            if (hp.size() != 2) {
+                continue;
+            }
+            HostAddress addr(QString::fromLatin1(hp.at(0)));
+            bool ok = false;
+            const int port = hp.at(1).toInt(&ok);
+            if (!addr.isNull() && ok && port > 0 && port <= 65535) {
+                addresses.insert(qMakePair(addr, static_cast<quint16>(port)));
+            }
+        }
+        if (!addresses.isEmpty()) {
+            peer->setExtraKnownPeers(addresses);
+        }
+    }
     started = peer->start();
     setAcceptDrops(true);
     ui->txtContent->setAcceptDrops(false);
@@ -461,7 +495,12 @@ void LafdupWindow::setWindowTop(int state)
     bool wasActive = this->isActiveWindow();
     bool isTopMost = (state == Qt::Checked);
     hide();
+#if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
     setWindowFlag(Qt::WindowStaysOnTopHint, isTopMost);
+#else
+    setWindowFlags(isTopMost ? (windowFlags() | Qt::WindowStaysOnTopHint)
+                             : (windowFlags() & ~Qt::WindowStaysOnTopHint));
+#endif
     this->resize(size);
     this->move(pos);
     show();

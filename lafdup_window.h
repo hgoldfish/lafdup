@@ -54,6 +54,7 @@ private:
     void updateMyIP();
     void loadPassword();
     void loadConfiguration(bool withPassword);
+    static quint16 portFromEnvironment(quint16 defaultPort);
 private:
     Ui::LafdupWindow *ui;
     QSharedPointer<LafdupPeer> peer;

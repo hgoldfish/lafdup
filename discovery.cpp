@@ -228,7 +228,7 @@ bool LafdupDiscovery::start()
         return true;
     }
 
-    if (!d->kcpSocket->bind(d->port)) {
+    if (!d->kcpSocket->bind(d->port, static_cast<Socket::BindMode>(Socket::ReuseAddressHint))) {
         qCWarning(logger) << "can not bind kcp server on port" << d->port;
         return false;
     }
@@ -237,7 +237,7 @@ bool LafdupDiscovery::start()
         return false;
     }
 
-    if (!d->tcpServer->bind(d->port)) {
+    if (!d->tcpServer->bind(d->port, static_cast<Socket::BindMode>(Socket::ReuseAddressHint))) {
         qCWarning(logger) << "can not bind tcp server on port" << d->port;
         return false;
     }

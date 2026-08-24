@@ -1,3 +1,7 @@
 translations/lafdup_zh_CN.qm
 lafdup
 CMakeLists.txt.user*
+.build-winxp/
+dist/
+__pycache__/
+lafrpc

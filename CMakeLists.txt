@@ -14,8 +14,6 @@ else()
     add_subdirectory(lafrpc/cpp lafrpc)
 endif()
 
-cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
-
 set(CMAKE_AUTOMOC ON)
 SET(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
@@ -55,8 +53,71 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
 endif()
 
+# Fix Qt-static cmake BUG
+# https://bugreports.qt.io/browse/QTBUG-38913
+# FIXME qt 5.13 fix this bug
+if(EXISTS ${_qt5Core_install_prefix}/lib/libQt5Core.a AND NOT EXISTS ${_qt5Core_install_prefix}/bin/Qt5Core.dll)
+    message("Static Qt is detected.")
+    link_directories(${_qt5Core_install_prefix}/lib/)
+endif()
+
+# MinGW XP toolchains: avoid Vista+ imports without patching LibreSSL sources.
+# - pthread.h: prepend our include dir so LibreSSL TUs see XP pthread_once
+# - getentropy: provide our object first so libcrypto's BCrypt getentropy is not pulled
+# - inet_pton / GetTickCount64: local import thunks
+set(LAFDUP_XP_SHIMS)
+if(MINGW AND LAFDUP_MINGW_XP_COMPAT)
+    enable_language(C)
+    set(_LAFDUP_XP_COMPAT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/xp-compat")
+
+    # Prefer our pthread.h over LibreSSL include/compat (no file copies into libressl/).
+    foreach(_t crypto_obj ssl_obj crypto ssl)
+        if(TARGET ${_t})
+            target_include_directories(${_t} BEFORE PRIVATE "${_LAFDUP_XP_COMPAT_DIR}")
+        endif()
+    endforeach()
+
+    # qtng/lafrpc/lafdup use XP WINNT; LibreSSL keeps its own 0x0600 (separate TUs, no -D clash).
+    foreach(_t qtng qtnetworkng lafrpc)
+        if(TARGET ${_t})
+            target_compile_definitions(${_t} PRIVATE
+                WINVER=${LAFDUP_XP_WINVER}
+                _WIN32_WINNT=${LAFDUP_XP_WINNT})
+        endif()
+    endforeach()
+
+    add_library(lafdup_xp_compat OBJECT
+        ${_LAFDUP_XP_COMPAT_DIR}/xp_api_shims.c
+        ${_LAFDUP_XP_COMPAT_DIR}/getentropy_win.c)
+    target_include_directories(lafdup_xp_compat PRIVATE "${_LAFDUP_XP_COMPAT_DIR}")
+    target_compile_definitions(lafdup_xp_compat PRIVATE
+        WINVER=${LAFDUP_XP_WINVER}
+        _WIN32_WINNT=${LAFDUP_XP_WINNT})
+    target_link_libraries(lafdup_xp_compat PUBLIC ws2_32 user32 advapi32)
+
+    # OBJECT sources first so local getentropy / __imp_* thunks win over archive/DLL imports.
+    set(LAFDUP_XP_SHIMS $<TARGET_OBJECTS:lafdup_xp_compat>)
+endif()
+
 add_executable(lafdup WIN32 ${LAFDUP_SRC})
-target_link_libraries(lafdup Qt5::Widgets Qt5::Core lafrpc)
+target_link_libraries(lafdup Qt5::Widgets Qt5::Core lafrpc ${LAFDUP_XP_SHIMS})
+# Qt 静态链接时的私有 3rdparty 依赖（pcre/harfbuzz），见 Qt5Core/Gui.prl。
+# pcre 是 Qt5Core 的依赖、harfbuzz 是 Qt5Gui 的依赖；
+# 挂在各自模块的 INTERFACE 上，确保链接顺序紧跟对应模块之后。
+if(EXISTS ${_qt5Core_install_prefix}/lib/libqtpcre.a)
+    target_link_libraries(Qt5::Core INTERFACE ${_qt5Core_install_prefix}/lib/libqtpcre.a)
+endif()
+if(EXISTS ${_qt5Core_install_prefix}/lib/libqtharfbuzzng.a)
+    target_link_libraries(Qt5::Gui INTERFACE ${_qt5Core_install_prefix}/lib/libqtharfbuzzng.a)
+endif()
+if(LAFDUP_XP_SHIMS)
+    target_compile_definitions(lafdup PRIVATE
+        WINVER=${LAFDUP_XP_WINVER}
+        _WIN32_WINNT=${LAFDUP_XP_WINNT})
+    # qAsConst() 是 Qt 5.7+ API；XP 构建强制注入兼容实现。
+    # 拆成两个参数，避免 CMake 将 "-include <path>" 合并为带引号的单参数。
+    target_compile_options(lafdup PRIVATE "-include" "${CMAKE_CURRENT_SOURCE_DIR}/compat/qasconst.h")
+endif()
 
 #查找Qt翻译工具
 find_package(Qt5 COMPONENTS LinguistTools QUIET)

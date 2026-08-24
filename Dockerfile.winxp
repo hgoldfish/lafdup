@@ -1,0 +1,167 @@
+# lafdup Windows XP 交叉编译环境。
+# Debian 12 (bookworm) + mingw-w64 (MSVCRT, i686) + 自编译静态 Qt 5.6.3。
+# Qt 5.6.3 是最后一个官方支持 Windows XP 的 Qt 版本；
+# 通过 _WIN32_WINNT=0x0501 / WINVER=0x0501 宏与 PE 子系统版本 5.1 实现 XP 兼容。
+# 构建驱动（/usr/local/bin/lafdup-winxp-build）在 /lafdup（= 挂载的 pc 目录）内
+# 编译；/lafdup/qtng 挂载存在时，自动让 lafrpc 使用 qtng 的 Qt binding
+# （LAFRPC_USE_QTNG=ON），否则回退独立 qtnetworkng。
+FROM debian:bookworm
+
+# Optional: use a China HTTP mirror (no ca-certificates needed yet).
+RUN sed -i \
+        -e 's#https\?://deb.debian.org#http://mirrors.ustc.edu.cn#g' \
+        -e 's#https\?://security.debian.org#http://mirrors.ustc.edu.cn/debian-security#g' \
+        /etc/apt/sources.list.d/debian.sources \
+    || sed -i \
+        -e 's#https\?://deb.debian.org#http://mirrors.ustc.edu.cn#g' \
+        -e 's#https\?://security.debian.org#http://mirrors.ustc.edu.cn/debian-security#g' \
+        /etc/apt/sources.list \
+    || true
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        file \
+        g++-mingw-w64-i686 \
+        libz-mingw-w64-dev \
+        make \
+        perl \
+        python3 \
+        qttools5-dev-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Prefer POSIX threading model for C++11 std::mutex / libstdc++ threading.
+# libwinpthread references GetTickCount64; pc/cmake/xp-compat/xp_api_shims.c supplies
+# a local __imp_GetTickCount64 thunk so the PE does not import it from kernel32.
+RUN update-alternatives --set i686-w64-mingw32-g++ /usr/bin/i686-w64-mingw32-g++-posix \
+    && update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
+
+# Qt 5.6.3 (last Qt officially supporting Windows XP) source tree.
+# Top dir varies by source: GitHub tag-archive is qtbase-v5.6.3,
+# official archive (tar.xz) extracts as qtbase-opensource-src-5.6.3.
+ADD .build-winxp/qtbase-5.6.3.tar.gz /opt/
+RUN if [ -d /opt/qtbase-v5.6.3 ]; then mv /opt/qtbase-v5.6.3 /opt/qtbase-5.6.3; fi \
+    && if [ -d /opt/qtbase-opensource-src-5.6.3 ]; then mv /opt/qtbase-opensource-src-5.6.3 /opt/qtbase-5.6.3; fi \
+    && test -d /opt/qtbase-5.6.3
+
+# Cross-compile Qt 5.6.3 (static, release, Windows XP target).
+# - WINVER/_WIN32_WINNT=0x0501 keeps Qt off Vista+ APIs (GetTickCount64, ...)
+# - linker flags set PE OS/subsystem version 5.1
+# - -no-pch avoids a GCC 12 precompiled-header crash while building old Qt code
+# - syncqt.pl must run manually: the GitHub tag-archive has no .git so configure
+#   would skip header generation (QtCore/qsystemdetection.h would be missing)
+# - MinGW-w64 10+ already defines _FILE_ID_INFO in winbase.h; guard the Qt copy
+RUN cd /opt/qtbase-5.6.3 \
+    && perl bin/syncqt.pl -version 5.6.3 . >/dev/null \
+    && sed -i 's|^QMAKE_CFLAGS            = -pipe -fno-keep-inline-dllexport|QMAKE_CFLAGS            = -pipe -fno-keep-inline-dllexport -D_WIN32_WINNT=0x0501 -DWINVER=0x0501|' mkspecs/win32-g++/qmake.conf \
+    && sed -i 's|^QMAKE_LFLAGS            =|QMAKE_LFLAGS            = -Wl,--major-os-version,5 -Wl,--minor-os-version,1 -Wl,--major-subsystem-version,5 -Wl,--minor-subsystem-version,1|' mkspecs/win32-g++/qmake.conf \
+    && python3 - <<'PYEOF'
+p = '/opt/qtbase-5.6.3/src/corelib/io/qfilesystemengine_win.cpp'
+s = open(p).read()
+old = '''typedef struct _FILE_ID_INFO {
+    ULONGLONG VolumeSerialNumber;
+    FILE_ID_128 FileId;
+} FILE_ID_INFO, *PFILE_ID_INFO;'''
+new = '''#    if !defined(Q_CC_MINGW)
+typedef struct _FILE_ID_INFO {
+    ULONGLONG VolumeSerialNumber;
+    FILE_ID_128 FileId;
+} FILE_ID_INFO, *PFILE_ID_INFO;
+#    endif'''
+assert s.count(old) == 1, 'FILE_ID_INFO patch target not found'
+open(p, 'w').write(s.replace(old, new))
+PYEOF
+
+RUN cd /opt/qtbase-5.6.3 \
+    && ./configure \
+        -opensource -confirm-license \
+        -release -static \
+        -no-pch \
+        -platform linux-g++ \
+        -xplatform win32-g++ \
+        -device-option CROSS_COMPILE=i686-w64-mingw32- \
+        -prefix /opt/qt-winxp \
+        -hostprefix /opt/qt-host \
+        -no-opengl -no-icu -no-dbus -no-openssl -no-gstreamer \
+        -no-xcb -no-xkbcommon -no-eglfs -no-linuxfb -no-kms \
+        -qt-zlib -qt-pcre -qt-libpng -qt-libjpeg \
+        -nomake examples -nomake tests \
+    && make -j"$(nproc)" \
+    && make install \
+    && mkdir -p /opt/qt-winxp/bin \
+    && for tool in moc rcc uic qmake; do \
+        if [ -f "/opt/qt-host/bin/$tool" ]; then cp -f "/opt/qt-host/bin/$tool" "/opt/qt-winxp/bin/$tool.exe"; fi; \
+       done \
+    && cp -R /opt/qt-host/mkspecs /opt/qt-winxp/mkspecs \
+    && file /opt/qt-winxp/bin/*.exe | head
+
+# lafdup WinXP build driver (runs inside the container, /lafdup is the mounted checkout).
+RUN printf '%s\n' \
+        '#!/bin/sh' \
+        'set -eu' \
+        'LAFDUP_DIR=/lafdup' \
+        'BUILD_ROOT="$LAFDUP_DIR/.build-winxp/build"' \
+        'JOBS="$(nproc)"' \
+        'cd "$LAFDUP_DIR"' \
+        '' \
+        '# Generate .qm if missing (host lrelease; the .qm file is .gitignore''d).' \
+        'if [ -f translations/lafdup_zh_CN.ts ] && ! [ -f translations/lafdup_zh_CN.qm ]; then' \
+        '  lrelease translations/lafdup_zh_CN.ts -qm translations/lafdup_zh_CN.qm' \
+        'fi' \
+        '' \
+        '# lafrpc 自动切换网络库：挂载的 /lafdup/qtng（qtng 仓库）存在时，' \
+        '# 用 qtng 的 Qt binding（qtng/qt，兼容 qtnetworkng 目标）取代已弃用的独立 qtnetworkng 项目。' \
+        'QTNG_CMAKE_ARGS=""' \
+        'if [ -f /lafdup/qtng/qt/CMakeLists.txt ]; then' \
+        '  echo "qtng Qt binding detected at /lafdup/qtng; building with LAFRPC_USE_QTNG=ON"' \
+        '  QTNG_CMAKE_ARGS="-DLAFRPC_USE_QTNG=ON"' \
+        'else' \
+        '  echo "qtng not found under /lafdup/qtng; falling back to standalone qtnetworkng"' \
+        'fi' \
+        '' \
+        'rm -rf "$BUILD_ROOT"' \
+        'mkdir -p "$BUILD_ROOT"' \
+        'cmake -S . -B "$BUILD_ROOT" \' \
+        '    -DCMAKE_TOOLCHAIN_FILE="$LAFDUP_DIR/cmake/toolchain-mingw-win32.cmake" \' \
+        '    -DCMAKE_BUILD_TYPE=Release \' \
+        '    -DZLIB_LIBRARY=/usr/i686-w64-mingw32/lib/libz.a \' \
+        '    -DZLIB_INCLUDE_DIR=/usr/i686-w64-mingw32/include \' \
+        '    $QTNG_CMAKE_ARGS' \
+        'cmake --build "$BUILD_ROOT" -j "$JOBS" --target lafdup' \
+        '' \
+        'path="$BUILD_ROOT/lafdup.exe"' \
+        'if [ ! -f "$path" ]; then' \
+        '  echo "missing binary: $path" >&2' \
+        '  exit 1' \
+        'fi' \
+        'file_out="$(file "$path")"' \
+        'echo "$file_out"' \
+        'case "$file_out" in' \
+        '  *"PE32 executable"*) ;;' \
+        '  *) echo "ERROR: $path is not PE32 (i686)" >&2; exit 1 ;;' \
+        'esac' \
+        'dump="$(i686-w64-mingw32-objdump -p "$path")"' \
+        'echo "$dump" | grep -E "MajorOSystemVersion|MinorOSystemVersion|MajorSubsystemVersion|MinorSubsystemVersion" || true' \
+        'echo "$dump" | grep -q "MajorOSystemVersion[[:space:]]*5" || { echo "ERROR: $path MajorOSystemVersion is not 5" >&2; exit 1; }' \
+        'echo "$dump" | grep -q "MinorOSystemVersion[[:space:]]*1" || { echo "ERROR: $path MinorOSystemVersion is not 1" >&2; exit 1; }' \
+        'if echo "$dump" | grep -E "DLL Name:" | grep -qiE "winpthread|libgcc|libstdc|libssp|bcrypt"; then' \
+        '  echo "ERROR: $path still depends on MinGW runtime or Vista+ DLLs:" >&2' \
+        '  echo "$dump" | grep -E "DLL Name:" >&2' \
+        '  exit 1' \
+        'fi' \
+        'for bad in GetTickCount64 InitOnceExecuteOnce BCryptGenRandom inet_pton inet_ntop AddVectoredExceptionHandler RemoveVectoredExceptionHandler; do' \
+        '  if echo "$dump" | grep -E "^[[:space:]]+[0-9a-fA-F]+[[:space:]]+[0-9]+[[:space:]]+$bad\$" >/dev/null; then' \
+        '    echo "ERROR: $path still imports Vista+ API: $bad" >&2' \
+        '    exit 1' \
+        '  fi' \
+        'done' \
+        'echo "DLL deps:"' \
+        'echo "$dump" | grep -E "DLL Name:" || true' \
+        'echo "xp pe ok: $path"' \
+        > /usr/local/bin/lafdup-winxp-build \
+    && chmod +x /usr/local/bin/lafdup-winxp-build
+
+WORKDIR /lafdup
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/lafdup-winxp-build"]

@@ -1,0 +1,9 @@
+# 构建输出目录不入 Docker context
+**/build/
+**/dist/
+**/*.log
+
+# .build-winxp 下只保留 tar.gz 供 ADD 解压；解压目录与构建产物单独排除。
+# 注意不能用 build-* 通配，否则会把 .build-winxp 整个排除、连带踢掉 tar.gz。
+.build-winxp/qtbase-5.6.3/
+.build-winxp/build/

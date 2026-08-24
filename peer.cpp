@@ -293,13 +293,26 @@ static bool isPassword(const QString &text)
     return true;
 }
 
-void LafdupPeerPrivate::_outgoingSync(CopyPaste copyPaste, bool force)
+void LafdupPeerPrivate::_outgoingSync(CopyPaste copyPaste, bool unlimited)
 {
-    if (!canSendContent(copyPaste, force)) {
+    if (!canSendContent(copyPaste, unlimited)) {
+        if (copyPaste.mimeType == TextType) {
+            qCWarning(logger) << "send text rejected: looks like a short password and syncing short text is disabled.";
+        } else if (copyPaste.mimeType == BinaryType) {
+            qCWarning(logger) << "send files rejected: sending is disabled or total size exceeds send_files_size limit.";
+        }
         return;
     }
     const QList<QString> peerList = rpc->getAllPeerNames();
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
     QSet<QString> peerNames(peerList.begin(), peerList.end());
+#else
+    QSet<QString> peerNames = QSet<QString>::fromList(peerList);
+#endif
+    if (peerNames.isEmpty()) {
+        qCWarning(logger) << "send content: no peer is connected, nothing sent.";
+        return;
+    }
     CoroutineGroup workers;
     QList<QSharedPointer<QString>> errorStrings;
     for (const QString &peerName : qAsConst(peerNames)) {
@@ -637,6 +650,22 @@ void LafdupPeerPrivate::_cleanFiles(const QDir &dir, bool cleanAll)
     }
 }
 
+static void finishStreamCoroutine(const QSharedPointer<Coroutine> &streamTask, bool success)
+{
+    if (streamTask.isNull()) {
+        return;
+    }
+    // Success: wait for nested-channel DESTROY teardown.
+    // Failure: kill — readFrom may be blocked forever in takeChannel().
+    if (!success) {
+        streamTask->kill();
+    }
+    try {
+        streamTask->join();
+    } catch (CoroutineException &) {
+    }
+}
+
 bool LafdupPeerPrivate::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, const CopyPaste &copyPaste, QString *errorString)
 {
     float seconds = 20.0;
@@ -672,7 +701,7 @@ bool LafdupPeerPrivate::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, con
         } catch (TimeoutException &e) {
             *errorString = e.what();
         }
-        t->join();
+        finishStreamCoroutine(t, result && errorString->isEmpty());
     } else if (copyPaste.mimeType == ImageType) {
         QByteArray imageData = copyPaste.image;
         QSharedPointer<RpcFile> rpcFile(new RpcFile());
@@ -683,12 +712,10 @@ bool LafdupPeerPrivate::sendContentToPeer(QSharedPointer<lafrpc::Peer> peer, con
             result = peer->call("lafdup.pasteImage", copyPaste.timestamp, QVariant::fromValue(rpcFile)).toBool();
         } catch (RpcException &e) {
             *errorString = e.what();
-            return false;
         } catch (TimeoutException &e) {
             *errorString = e.what();
-            return false;
         }
-        t->join();
+        finishStreamCoroutine(t, result && errorString->isEmpty());
     }
     return result;
 }
@@ -757,7 +784,6 @@ void VirtualRpcDirFileProvider::addFileInfo(const QFileInfo &fileInfo)
 static void _populate(const QDir &dir, const QString &relativePath, PopulateResult &result)
 {
     QDir::Filters filters = QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot | QDir::Readable | QDir::Hidden;
-    //    QDir::Filters filters = QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot;
     for (const QFileInfo &fileInfo : static_cast<const QFileInfoList>(dir.entryInfoList(filters, QDir::DirsFirst))) {
         RpcDirFileEntry entry;
         const QString &name = fileInfo.fileName();

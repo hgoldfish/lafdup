@@ -39,19 +39,19 @@ int main(int argc, char **argv)
 #endif
     app.translationLanguage();
 
-    QSystemSemaphore sema("systemSemaphore", 1, QSystemSemaphore::Open);
-    sema.acquire();
-    QSharedMemory mem("memory");
-    if (!mem.create(1)) {
-        QMessageBox::information(nullptr, QObject::tr("tips"),
-                                 QObject::tr("The program is running, please exit first if necessary"));
-        sema.release();
-        return 0;
-    }
-    sema.release();
+    // QSystemSemaphore sema("systemSemaphore", 1, QSystemSemaphore::Open);
+    // sema.acquire();
+    // QSharedMemory mem("memory");
+    // if (!mem.create(1)) {
+    //     QMessageBox::information(nullptr, QObject::tr("tips"),
+    //                              QObject::tr("The program is running, please exit first if necessary"));
+    //     sema.release();
+    //     return 0;
+    // }
+    // sema.release();
 
-    QSettings *settings = new QSettings;
-    if (!LafdupApplication::hasStoredPassword(settings->value("password").toByteArray())) {
+    QSettings settings;
+    if (!LafdupApplication::hasStoredPassword(settings.value("password").toByteArray())) {
         GuideDialog guide;
         guide.show();
         int result = guide.exec();
@@ -61,11 +61,10 @@ int main(int argc, char **argv)
     }
 
     LafdupWindow w;
-    if (settings->value("isMinimized").toBool()) {
+    if (settings.value("isMinimized").toBool()) {
         w.showMinimized();
     } else {
         w.showAndGetFocus();
     }
-    delete settings;
     return qtng::startQtLoop();
 }
